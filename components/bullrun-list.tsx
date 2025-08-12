@@ -74,7 +74,7 @@ export function BullRunList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-center">
         <div className="flex space-x-2">
           <button
             onClick={() => setActiveTab("active")}

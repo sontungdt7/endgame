@@ -21,6 +21,8 @@ interface BullRunCardProps {
   bullRun: BullRun
 }
 
+const mockTotalPlayers = Math.floor(Math.random() * 50) + 5 // Random number between 5-54
+
 export function BullRunCard({ bullRun }: BullRunCardProps) {
   const isActive = bullRun.status === "active"
   const isUrgent = bullRun.timeLeft.includes("m") && !bullRun.timeLeft.includes("h")
@@ -74,14 +76,9 @@ export function BullRunCard({ bullRun }: BullRunCardProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <User className="w-4 h-4 text-green-400" />
-                  <span className="text-sm text-gray-400">Last Buyer</span>
+                  <span className="text-sm text-gray-400">Total Players</span>
                 </div>
-                <span className="font-semibold text-green-400 truncate max-w-24">{bullRun.lastBuyer}</span>
-              </div>
-
-              <div className="bg-gray-700/50 rounded-lg p-2">
-                <div className="text-xs text-gray-400 mb-1">Min Buy to Take Lead</div>
-                <div className="text-lg font-bold text-white">{bullRun.minBuy} USDC</div>
+                <span className="font-semibold text-green-400">{mockTotalPlayers}</span>
               </div>
             </>
           ) : (
