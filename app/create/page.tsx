@@ -34,7 +34,7 @@ export default function CreateBullRunPage() {
           <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-green-400 to-yellow-400 bg-clip-text text-transparent">
             Create Game
           </h1>
-          <p className="text-gray-400">Launch a "Last Buyer Wins" game on any Zora post and watch it go viral</p>
+          <p className="text-gray-400">Launch a "Last Buyer Wins" game on any Zora Creator/Post Coin and watch it go viral.</p>
         </div>
 
         <PrivyWalletGuard>

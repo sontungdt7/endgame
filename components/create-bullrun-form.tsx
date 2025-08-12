@@ -21,7 +21,7 @@ interface CreateBullRunFormProps {
 
 export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
   const [formData, setFormData] = useState({
-    postCoinAddress: "",
+    coinAddress: "",
     prizePool: "100",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -30,11 +30,11 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    // Validate PostCoin address
-    if (!formData.postCoinAddress) {
-      newErrors.postCoinAddress = "PostCoin address is required"
-    } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.postCoinAddress)) {
-      newErrors.postCoinAddress = "Invalid Ethereum address format"
+    // Validate Coin address
+    if (!formData.coinAddress) {
+      newErrors.coinAddress = "Coin address is required"
+    } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.coinAddress)) {
+      newErrors.coinAddress = "Invalid Ethereum address format"
     }
 
     // Validate prize pool
@@ -78,34 +78,26 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* PostCoin Address */}
+      {/* Coin Address */}
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Link className="w-5 h-5 text-blue-400" />
-            <span>Target Post</span>
+            <span>Target Coin</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="postCoinAddress">PostCoin Address</Label>
+            <Label htmlFor="coinAddress">Zora Creator Coin or Post Coin Address</Label>
             <Input
-              id="postCoinAddress"
+              id="coinAddress"
               placeholder="0x1234567890abcdef1234567890abcdef12345678"
-              value={formData.postCoinAddress}
-              onChange={(e) => setFormData({ ...formData, postCoinAddress: e.target.value })}
+              value={formData.coinAddress}
+              onChange={(e) => setFormData({ ...formData, coinAddress: e.target.value })}
               className="bg-gray-700 border-gray-600 font-mono"
             />
-            {errors.postCoinAddress && <p className="text-red-400 text-sm">{errors.postCoinAddress}</p>}
-          </div>
-
-          <Alert className="border-blue-500/30 bg-blue-500/10">
-            <AlertCircle className="h-4 w-4 text-blue-400" />
-            <AlertDescription className="text-blue-300">
-              Enter the PostCoin contract address from the Zora post you want to make viral. You can find this in the
-              post's details or transaction history.
-            </AlertDescription>
-          </Alert>
+            {errors.coinAddress && <p className="text-red-400 text-sm">{errors.coinAddress}</p>}
+          </div>          
         </CardContent>
       </Card>
 
