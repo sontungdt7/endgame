@@ -2,7 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
-import { WalletProvider } from "@/components/wallet-provider"
+import { PrivyProviderWrapper } from "@/components/privy-provider"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
@@ -29,10 +29,10 @@ html {
         `}</style>
       </head>
       <body className="bg-gray-900 text-white antialiased">
-        <WalletProvider>
+        <PrivyProviderWrapper>
           {children}
           <Toaster />
-        </WalletProvider>
+        </PrivyProviderWrapper>
       </body>
     </html>
   )

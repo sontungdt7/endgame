@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
-import { WalletConnectButton } from "@/components/wallet-connect-button"
+import { PrivyWalletConnectButton } from "@/components/privy-wallet-connect-button"
 
 export function GameHeader() {
   return (
@@ -16,7 +16,7 @@ export function GameHeader() {
           </Link>
         </div>
 
-        <WalletConnectButton />
+        <PrivyWalletConnectButton />
       </div>
     </header>
   )

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { WalletConnectButton } from "@/components/wallet-connect-button"
+import { PrivyWalletConnectButton } from "@/components/privy-wallet-connect-button"
 
 export function Header() {
   return (
@@ -19,7 +19,7 @@ export function Header() {
           </nav>
         </div>
 
-        <WalletConnectButton />
+        <PrivyWalletConnectButton />
       </div>
     </header>
   )

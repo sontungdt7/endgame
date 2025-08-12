@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { TrendingUp, DollarSign } from "lucide-react"
 import { useState } from "react"
-import { useWallet } from "@/components/wallet-provider"
-import { WalletConnectButton } from "@/components/wallet-connect-button"
+import { usePrivy, useWallets } from '@privy-io/react-auth'
+import { PrivyWalletConnectButton } from "@/components/privy-wallet-connect-button"
 
 interface GameData {
   minBuy: number
@@ -19,7 +19,10 @@ interface GameActionsProps {
 
 export function GameActions({ game }: GameActionsProps) {
   const [buyAmount, setBuyAmount] = useState(game.minBuy.toString())
-  const { isConnected } = useWallet()
+  const { authenticated } = usePrivy()
+  const { wallets } = useWallets()
+  
+  const isConnected = authenticated && wallets.length > 0
 
   const handleBuyNow = () => {
     // This would trigger the smart contract interaction
@@ -48,7 +51,7 @@ export function GameActions({ game }: GameActionsProps) {
         {!isConnected ? (
           <div className="text-center space-y-4">
             <p className="text-gray-400 text-sm">Connect your wallet to join the BullRun</p>
-            <WalletConnectButton />
+            <PrivyWalletConnectButton />
           </div>
         ) : (
           <>

@@ -4,7 +4,7 @@ import { useState } from "react"
 import { GameHeader } from "@/components/game-header"
 import { CreateBullRunForm } from "@/components/create-bullrun-form"
 import { CreateConfirmation } from "@/components/create-confirmation"
-import { WalletGuard } from "@/components/wallet-guard"
+import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
 
 export default function CreateBullRunPage() {
   const [step, setStep] = useState<"form" | "confirmation">("form")
@@ -37,7 +37,7 @@ export default function CreateBullRunPage() {
           <p className="text-gray-400">Launch a "Last Buyer Wins" game on any Zora post and watch it go viral</p>
         </div>
 
-        <WalletGuard>
+        <PrivyWalletGuard>
           {step === "form" && <CreateBullRunForm onGameCreated={handleGameCreated} />}
           {step === "confirmation" && createdGame && (
             <CreateConfirmation
@@ -48,7 +48,7 @@ export default function CreateBullRunPage() {
               }}
             />
           )}
-        </WalletGuard>
+        </PrivyWalletGuard>
       </main>
     </div>
   )
