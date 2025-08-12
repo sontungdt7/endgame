@@ -38,14 +38,8 @@ export function BullRunCard({ bullRun }: BullRunCardProps) {
             height={200}
             className="w-full h-48 object-cover rounded-t-lg"
           />
-          <Badge
-            className={`absolute top-2 right-2 ${
-              isActive
-                ? "bg-green-500/20 text-green-400 border-green-500/30"
-                : "bg-gray-500/20 text-gray-400 border-gray-500/30"
-            }`}
-          >
-            {isActive ? "Active" : "Ended"}
+          <Badge className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 border-blue-500/30">
+            Game #{bullRun.id}
           </Badge>
         </div>
       </CardHeader>
@@ -62,15 +56,6 @@ export function BullRunCard({ bullRun }: BullRunCardProps) {
             <span className="text-xl font-bold text-yellow-400">{bullRun.prizePool} USDC</span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-400">Time Left</span>
-            <span
-              className={`font-semibold ${isActive ? (isUrgent ? "text-red-400" : "text-green-400") : "text-gray-400"}`}
-            >
-              {isActive ? bullRun.timeLeft : "Ended"}
-            </span>
-          </div>
-
           {isActive ? (
             <>
               <div className="flex items-center justify-between">
@@ -80,15 +65,29 @@ export function BullRunCard({ bullRun }: BullRunCardProps) {
                 </div>
                 <span className="font-semibold text-green-400">{mockTotalPlayers}</span>
               </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">Time Left</span>
+                <span className={`font-semibold ${isUrgent ? "text-red-400" : "text-green-400"}`}>
+                  {bullRun.timeLeft}
+                </span>
+              </div>
             </>
           ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Crown className="w-4 h-4 text-yellow-400" />
-                <span className="text-sm text-gray-400">Winner</span>
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-400">Time Left</span>
+                <span className="font-semibold text-gray-400">Ended</span>
               </div>
-              <span className="font-semibold text-yellow-400 truncate max-w-24">{bullRun.winner}</span>
-            </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Crown className="w-4 h-4 text-yellow-400" />
+                  <span className="text-sm text-gray-400">Winner</span>
+                </div>
+                <span className="font-semibold text-yellow-400 truncate max-w-24">{bullRun.winner}</span>
+              </div>
+            </>
           )}
         </div>
       </CardContent>
