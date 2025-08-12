@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { GameHeader } from "@/components/game-header"
+import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
 
 // Mock data - in real app this would come from API/blockchain
 const getMockGameData = (id: string) => {
@@ -137,170 +138,172 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
               </div>
 
               {/* Action Panel */}
-              <div className="space-y-4">
-                {isEnded ? (
-                  // Ended Game Actions
-                  <div className="space-y-4">
-                    <div className="bg-gray-700 rounded-lg p-4 text-center">
-                      <h3 className="text-lg font-bold mb-2 text-red-400">Game Ended</h3>
+              <PrivyWalletGuard>
+                <div className="space-y-4">
+                  {isEnded ? (
+                    // Ended Game Actions
+                    <div className="space-y-4">
+                      <div className="bg-gray-700 rounded-lg p-4 text-center">
+                        <h3 className="text-lg font-bold mb-2 text-red-400">Game Ended</h3>
+                        {hasNoPlayers ? (
+                          <p className="text-gray-300 text-sm mb-4">No players joined this game</p>
+                        ) : (
+                          <p className="text-gray-300 text-sm mb-4">
+                            Winner: <span className="text-blue-400 font-medium">{mockGameData.winner}</span>
+                          </p>
+                        )}
+                      </div>
+
                       {hasNoPlayers ? (
-                        <p className="text-gray-300 text-sm mb-4">No players joined this game</p>
+                        <button className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-lg transition-colors">
+                          Refund Prize Pool
+                        </button>
                       ) : (
-                        <p className="text-gray-300 text-sm mb-4">
-                          Winner: <span className="text-blue-400 font-medium">{mockGameData.winner}</span>
-                        </p>
+                        <button
+                          className={`w-full font-bold py-3 rounded-lg transition-colors ${
+                            isWinner
+                              ? "bg-green-600 hover:bg-green-700 text-white"
+                              : "bg-gray-600 text-gray-400 cursor-not-allowed"
+                          }`}
+                          disabled={!isWinner}
+                        >
+                          {isWinner ? "Claim Prize" : "Prize Claimed"}
+                        </button>
                       )}
-                    </div>
 
-                    {hasNoPlayers ? (
-                      <button className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-lg transition-colors">
-                        Refund Prize Pool
-                      </button>
-                    ) : (
-                      <button
-                        className={`w-full font-bold py-3 rounded-lg transition-colors ${
-                          isWinner
-                            ? "bg-green-600 hover:bg-green-700 text-white"
-                            : "bg-gray-600 text-gray-400 cursor-not-allowed"
-                        }`}
-                        disabled={!isWinner}
-                      >
-                        {isWinner ? "Claim Prize" : "Prize Claimed"}
-                      </button>
-                    )}
-
-                    <div className="bg-gray-700 rounded-lg p-4">
-                      <h3 className="text-lg font-bold mb-2">Game Results</h3>
-                      <ul className="text-sm text-gray-300 space-y-1">
-                        <li>• Prize Pool: ${mockGameData.prizePool} USDC</li>
-                        <li>• Total Players: {mockGameData.totalBuyers}</li>
-                        {mockGameData.winner && <li>• Winner: {mockGameData.winner}</li>}
-                        {hasNoPlayers && <li>• Refund available to sponsor</li>}
-                      </ul>
-                    </div>
-                  </div>
-                ) : (
-                  // Active Game Trading Interface
-                  <>
-                    <div className="flex mb-4">
-                      <button
-                        onClick={() => setActiveTab("buy")}
-                        className={`flex-1 py-2 px-4 rounded-l-lg font-medium transition-colors ${
-                          activeTab === "buy"
-                            ? "bg-green-600 text-white"
-                            : "bg-gray-600 text-gray-300 hover:bg-gray-500"
-                        }`}
-                      >
-                        Buy
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("sell")}
-                        className={`flex-1 py-2 px-4 rounded-r-lg font-medium transition-colors ${
-                          activeTab === "sell"
-                            ? "bg-pink-600 text-white"
-                            : "bg-gray-600 text-gray-300 hover:bg-gray-500"
-                        }`}
-                      >
-                        Sell
-                      </button>
-                    </div>
-
-                    <div className="flex justify-between items-center mb-4">
-                      <span className="text-gray-400 text-sm">Balance</span>
-                      <span className="text-white font-medium">{activeTab === "buy" ? "0 USDC" : "273.52"}</span>
-                    </div>
-
-                    {/* Amount Input */}
-                    <div className="relative mb-4">
-                      <input
-                        type="number"
-                        placeholder={activeTab === "buy" ? "0.000111" : "0.0"}
-                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-4 text-2xl font-bold text-white pr-20"
-                      />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
-                        {activeTab === "sell" && (
-                          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs">😊</span>
-                          </div>
-                        )}
-                        {activeTab === "buy" && (
-                          <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">U</span>
-                          </div>
-                        )}
-                        <span className="text-white font-medium">{activeTab === "buy" ? "USDC" : "ETH"}</span>
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                      <div className="bg-gray-700 rounded-lg p-4">
+                        <h3 className="text-lg font-bold mb-2">Game Results</h3>
+                        <ul className="text-sm text-gray-300 space-y-1">
+                          <li>• Prize Pool: ${mockGameData.prizePool} USDC</li>
+                          <li>• Total Players: {mockGameData.totalBuyers}</li>
+                          {mockGameData.winner && <li>• Winner: {mockGameData.winner}</li>}
+                          {hasNoPlayers && <li>• Refund available to sponsor</li>}
+                        </ul>
                       </div>
                     </div>
-
-                    {activeTab === "buy" ? (
-                      <div className="grid grid-cols-4 gap-2 mb-4">
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          1 USDC
+                  ) : (
+                    // Active Game Trading Interface
+                    <>
+                      <div className="flex mb-4">
+                        <button
+                          onClick={() => setActiveTab("buy")}
+                          className={`flex-1 py-2 px-4 rounded-l-lg font-medium transition-colors ${
+                            activeTab === "buy"
+                              ? "bg-green-600 text-white"
+                              : "bg-gray-600 text-gray-300 hover:bg-gray-500"
+                          }`}
+                        >
+                          Buy
                         </button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          5 USDC
-                        </button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          10 USDC
-                        </button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          Max
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-4 gap-2 mb-4">
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          25%
-                        </button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          50%
-                        </button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          75%
-                        </button>
-                        <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
-                          100%
+                        <button
+                          onClick={() => setActiveTab("sell")}
+                          className={`flex-1 py-2 px-4 rounded-r-lg font-medium transition-colors ${
+                            activeTab === "sell"
+                              ? "bg-pink-600 text-white"
+                              : "bg-gray-600 text-gray-300 hover:bg-gray-500"
+                          }`}
+                        >
+                          Sell
                         </button>
                       </div>
-                    )}
 
-                    <button
-                      className={`w-full font-bold py-3 rounded-lg transition-colors mb-4 ${
-                        activeTab === "buy"
-                          ? "bg-green-600 hover:bg-green-700 text-white"
-                          : "bg-pink-600 hover:bg-pink-700 text-white"
-                      }`}
-                    >
-                      {activeTab === "buy" ? "Buy" : "Sell"}
-                    </button>
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-gray-400 text-sm">Balance</span>
+                        <span className="text-white font-medium">{activeTab === "buy" ? "0 USDC" : "273.52"}</span>
+                      </div>
 
-                    {activeTab === "buy" && (
-                      <div className="flex justify-between items-center text-sm mb-4">
-                        <span className="text-gray-400">Minimum received</span>
-                        <div className="flex items-center space-x-1">
-                          <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
-                            <span className="text-black text-xs font-bold">G</span>
-                          </div>
-                          <span className="text-white font-medium">4,606</span>
+                      {/* Amount Input */}
+                      <div className="relative mb-4">
+                        <input
+                          type="number"
+                          placeholder={activeTab === "buy" ? "0.000111" : "0.0"}
+                          className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-4 text-2xl font-bold text-white pr-20"
+                        />
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+                          {activeTab === "sell" && (
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-black text-xs">😊</span>
+                            </div>
+                          )}
+                          {activeTab === "buy" && (
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <span className="text-black text-xs font-bold">U</span>
+                            </div>
+                          )}
+                          <span className="text-white font-medium">{activeTab === "buy" ? "USDC" : "ETH"}</span>
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
                         </div>
                       </div>
-                    )}
 
-                    <div className="bg-gray-700 rounded-lg p-4">
-                      <h3 className="text-lg font-bold mb-2">Game Rules</h3>
-                      <ul className="text-sm text-gray-300 space-y-1">
-                        <li>• Last buyer wins the entire prize pool</li>
-                        <li>• Each buy extends timer by 30 seconds</li>
-                        <li>• Minimum buy increases with each purchase</li>
-                        <li>• Winner can claim prize when timer ends</li>
-                      </ul>
-                    </div>
-                  </>
-                )}
-              </div>
+                      {activeTab === "buy" ? (
+                        <div className="grid grid-cols-4 gap-2 mb-4">
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            1 USDC
+                          </button>
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            5 USDC
+                          </button>
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            10 USDC
+                          </button>
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            Max
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2 mb-4">
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            25%
+                          </button>
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            50%
+                          </button>
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            75%
+                          </button>
+                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                            100%
+                          </button>
+                        </div>
+                      )}
+
+                      <button
+                        className={`w-full font-bold py-3 rounded-lg transition-colors mb-4 ${
+                          activeTab === "buy"
+                            ? "bg-green-600 hover:bg-green-700 text-white"
+                            : "bg-pink-600 hover:bg-pink-700 text-white"
+                        }`}
+                      >
+                        {activeTab === "buy" ? "Buy" : "Sell"}
+                      </button>
+
+                      {activeTab === "buy" && (
+                        <div className="flex justify-between items-center text-sm mb-4">
+                          <span className="text-gray-400">Minimum received</span>
+                          <div className="flex items-center space-x-1">
+                            <div className="w-4 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                              <span className="text-black text-xs font-bold">G</span>
+                            </div>
+                            <span className="text-white font-medium">4,606</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="bg-gray-700 rounded-lg p-4">
+                        <h3 className="text-lg font-bold mb-2">Game Rules</h3>
+                        <ul className="text-sm text-gray-300 space-y-1">
+                          <li>• Last buyer wins the entire prize pool</li>
+                          <li>• Each buy extends timer by 30 seconds</li>
+                          <li>• Minimum buy increases with each purchase</li>
+                          <li>• Winner can claim prize when timer ends</li>
+                        </ul>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </PrivyWalletGuard>
             </div>
           </div>
         </div>
