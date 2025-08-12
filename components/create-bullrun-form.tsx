@@ -2,13 +2,14 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { AlertCircle, Rocket, DollarSign, Link } from "lucide-react"
+import { AlertCircle, Rocket, DollarSign, Link, Search, ExternalLink, TrendingUp, Users } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useZoraCoin } from "@/hooks/use-zora-coin"
 
 interface CreateBullRunFormProps {
   onGameCreated: (gameData: {
@@ -26,6 +27,21 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
+  
+  const { coinData, isLoading: isCoinLoading, error: coinError, fetchCoinData, clearData } = useZoraCoin()
+
+  // Fetch coin data when address changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (formData.coinAddress && formData.coinAddress.trim() !== "") {
+        fetchCoinData(formData.coinAddress)
+      } else {
+        clearData()
+      }
+    }, 500) // Debounce for 500ms
+
+    return () => clearTimeout(timeoutId)
+  }, [formData.coinAddress, fetchCoinData, clearData])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -35,6 +51,8 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
       newErrors.coinAddress = "Coin address is required"
     } else if (!/^0x[a-fA-F0-9]{40}$/.test(formData.coinAddress)) {
       newErrors.coinAddress = "Invalid Ethereum address format"
+    } else if (coinError) {
+      newErrors.coinAddress = coinError
     }
 
     // Validate prize pool
@@ -89,15 +107,95 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="coinAddress">Zora Creator Coin or Post Coin Address</Label>
-            <Input
-              id="coinAddress"
-              placeholder="0x1234567890abcdef1234567890abcdef12345678"
-              value={formData.coinAddress}
-              onChange={(e) => setFormData({ ...formData, coinAddress: e.target.value })}
-              className="bg-gray-700 border-gray-600 font-mono"
-            />
+            <div className="relative">
+              <Input
+                id="coinAddress"
+                placeholder="0x1234567890abcdef1234567890abcdef12345678"
+                value={formData.coinAddress}
+                onChange={(e) => setFormData({ ...formData, coinAddress: e.target.value })}
+                className="bg-gray-700 border-gray-600 font-mono pr-10"
+              />
+              {isCoinLoading && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+                </div>
+              )}
+              {!isCoinLoading && formData.coinAddress && (
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              )}
+            </div>
             {errors.coinAddress && <p className="text-red-400 text-sm">{errors.coinAddress}</p>}
-          </div>          
+            {coinError && <p className="text-red-400 text-sm">{coinError}</p>}
+          </div>
+
+          {/* Coin Information Display */}
+          {coinData && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  {coinData.imageUrl && (
+                    <img 
+                      src={coinData.imageUrl} 
+                      alt={coinData.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                      }}
+                    />
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-white">{coinData.name}</h3>
+                    <p className="text-blue-300 text-sm">{coinData.symbol}</p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-blue-400 hover:text-blue-300"
+                  onClick={() => window.open(`https://zora.co/coin/${coinData.id}`, '_blank')}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              {coinData.description && (
+                <p className="text-gray-300 text-sm mb-3 line-clamp-2">{coinData.description}</p>
+              )}
+              
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                {coinData.marketCap && coinData.marketCap > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-green-400" />
+                    <span className="text-gray-300">Market Cap:</span>
+                    <span className="text-white">${coinData.marketCap.toLocaleString()}</span>
+                  </div>
+                )}
+                {coinData.volume24h && coinData.volume24h > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-yellow-400" />
+                    <span className="text-gray-300">24h Volume:</span>
+                    <span className="text-white">${coinData.volume24h.toLocaleString()}</span>
+                  </div>
+                )}
+                {coinData.totalSupply && coinData.totalSupply > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-purple-400" />
+                    <span className="text-gray-300">Total Supply:</span>
+                    <span className="text-white">{coinData.totalSupply.toLocaleString()}</span>
+                  </div>
+                )}
+                {coinData.price && coinData.price > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-4 h-4 text-green-400" />
+                    <span className="text-gray-300">Price:</span>
+                    <span className="text-white">${coinData.price.toFixed(6)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
