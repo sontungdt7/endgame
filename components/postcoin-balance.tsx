@@ -40,5 +40,6 @@ export function PostCoinBalance({ postCoinAddress, chainId, symbol }: PostCoinBa
     )
   }
 
-  return <span>{balance} {symbol}</span>
+  const formattedBalance = isNaN(parseFloat(balance)) ? '0.0' : parseFloat(balance).toFixed(1)
+  return <span>{formattedBalance} {symbol}</span>
 }

@@ -28,7 +28,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
     if (balance > 0 && game) {
       const amount = (balance * percentage) / 100
       setSellAmount(amount.toFixed(6)) // 6 decimal places for tokens
-      console.log(`Setting sell amount to ${amount.toFixed(6)} ${game.symbol || 'POST'} (${percentage}% of ${balance})`)
+      console.log(`Setting sell amount to ${amount.toFixed(6)} ${game.symbol || 'POST'} (${percentage}% of ${parseFloat(postCoinBalance).toFixed(1)})`)
     }
   }
   
@@ -234,7 +234,16 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                               : "bg-gray-600 text-gray-300 hover:bg-gray-500"
                           }`}
                         >
-                          Sell
+                          <div className="flex items-center justify-center space-x-2">
+                            {activeTab === "sell" && game.postThumbnail && game.postThumbnail !== "/placeholder.svg?height=200&width=300" && (
+                              <img 
+                                src={game.postThumbnail} 
+                                alt={game.symbol || "PostCoin"} 
+                                className="w-4 h-4 rounded-full object-cover"
+                              />
+                            )}
+                            <span>Sell</span>
+                          </div>
                         </button>
                       </div>
 
@@ -287,8 +296,20 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         )}
                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
                           {activeTab === "sell" && (
-                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                              <span className="text-black text-xs">😊</span>
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center overflow-hidden">
+                              {game.postThumbnail && game.postThumbnail !== "/placeholder.svg?height=200&width=300" ? (
+                                <img 
+                                  src={game.postThumbnail} 
+                                  alt={game.symbol || "PostCoin"} 
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                  <span className="text-black text-xs font-bold">
+                                    {game.symbol ? game.symbol.charAt(0).toUpperCase() : "P"}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                           {activeTab === "buy" && (
@@ -296,7 +317,9 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                               <span className="text-black text-xs font-bold">U</span>
                             </div>
                           )}
-                          <span className="text-white font-medium">{activeTab === "buy" ? "USDC" : "ETH"}</span>
+                          <span className="text-white font-medium">
+                            {activeTab === "buy" ? "USDC" : (game.symbol || "POST")}
+                          </span>
                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
@@ -356,6 +379,12 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                           >
                             100%
                           </button>
+                        </div>
+                      )}
+                      
+                      {activeTab === "sell" && (
+                        <div className="text-xs text-gray-500 mb-4 text-center">
+                          Selling {game.symbol || "POST"} tokens
                         </div>
                       )}
 

@@ -22,7 +22,8 @@ export function USDCBalance() {
     return <span className="text-red-400">Error loading balance</span>
   }
 
-  return <span>{balance} USDC</span>
+  const formattedBalance = isNaN(parseFloat(balance)) ? '0.0' : parseFloat(balance).toFixed(1)
+  return <span>{formattedBalance} USDC</span>
 }
 
 // Hook to get max buy amount from USDC balance
