@@ -1,4 +1,5 @@
 import { getCoin } from "@zoralabs/coins-sdk"
+import { setApiKey } from "@zoralabs/coins-sdk"
 
 export interface ZoraCoinData {
   id: string
@@ -16,6 +17,7 @@ export interface ZoraCoinData {
 
 export class ZoraService {
   private static instance: ZoraService
+  private initialized = false
 
   private constructor() {}
 
@@ -24,6 +26,19 @@ export class ZoraService {
       ZoraService.instance = new ZoraService()
     }
     return ZoraService.instance
+  }
+
+  private initializeIfNeeded() {
+    if (this.initialized) return
+
+    const apiKey = process.env.NEXT_PUBLIC_ZORA_API_KEY
+    if (apiKey) {
+      setApiKey(apiKey)
+      this.initialized = true
+      console.log('Zora service initialized successfully')
+    } else {
+      console.warn('Zora API key not configured. Post data will use fallback values.')
+    }
   }
 
   private normalizeAddress(address: string): string {
@@ -43,6 +58,14 @@ export class ZoraService {
   }
 
   async getCoinData(coinAddress: string): Promise<ZoraCoinData | undefined> {
+    // Initialize Zora service if needed
+    this.initializeIfNeeded()
+    
+    // If no API key, return undefined immediately
+    if (!this.initialized) {
+      return undefined
+    }
+
     try {
       const normalizedAddress = this.normalizeAddress(coinAddress)
       console.log('ZoraService: Fetching coin data for address:', coinAddress, 'normalized to:', normalizedAddress)
@@ -69,7 +92,7 @@ export class ZoraService {
         description: coinData.description,
         imageUrl: coinData.mediaContent?.previewImage?.medium || coinData.mediaContent?.originalUri,
         marketCap: parseFloat(coinData.marketCap || "0"),
-        price: coinData.tokenPrice?.priceInUsdc ? parseFloat(coinData.tokenPrice.priceInUsdc) : undefined,
+        price: undefined, // Price data not available in current API response
         volume24h: parseFloat(coinData.volume24h || "0"),
         totalSupply: parseInt(coinData.totalSupply || "0"),
         circulatingSupply: parseInt(coinData.totalSupply || "0"), // Using totalSupply as approximation

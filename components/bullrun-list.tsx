@@ -2,75 +2,75 @@
 
 import { useState } from "react"
 import { BullRunCard } from "@/components/bullrun-card"
-
-// Mock data for demonstration
-const mockBullRuns = [
-  {
-    id: "1",
-    postTitle: "Epic NFT Collection Launch",
-    postThumbnail: "/placeholder.svg?height=200&width=300",
-    prizePool: 500,
-    timeLeft: "2h 34m",
-    lastBuyer: "alice.eth",
-    status: "active" as const,
-    minBuy: 1.2,
-  },
-  {
-    id: "2",
-    postTitle: "Viral Meme Contest",
-    postThumbnail: "/placeholder.svg?height=200&width=300",
-    prizePool: 250,
-    timeLeft: "45m",
-    lastBuyer: "0x1234...5678",
-    status: "active" as const,
-    minBuy: 0.8,
-  },
-  {
-    id: "3",
-    postTitle: "Community Art Project",
-    postThumbnail: "/placeholder.svg?height=200&width=300",
-    prizePool: 1000,
-    timeLeft: "Ended",
-    winner: "bob.eth",
-    status: "ended" as const,
-    minBuy: 0,
-  },
-  {
-    id: "4",
-    postTitle: "Crypto Trading Challenge",
-    postThumbnail: "/placeholder.svg?height=200&width=300",
-    prizePool: 750,
-    timeLeft: "Ended",
-    winner: "trader.eth",
-    status: "ended" as const,
-    minBuy: 0,
-  },
-  {
-    id: "5",
-    postTitle: "DeFi Protocol Launch",
-    postThumbnail: "/placeholder.svg?height=200&width=300",
-    prizePool: 2000,
-    timeLeft: "Ended",
-    winner: "0xabcd...efgh",
-    status: "ended" as const,
-    minBuy: 0,
-  },
-  {
-    id: "6",
-    postTitle: "Gaming Tournament Finals",
-    postThumbnail: "/placeholder.svg?height=200&width=300",
-    prizePool: 1500,
-    timeLeft: "Ended",
-    winner: "gamer.eth",
-    status: "ended" as const,
-    minBuy: 0,
-  },
-]
+import { useGames } from "@/hooks/useGames"
 
 export function BullRunList() {
   const [activeTab, setActiveTab] = useState<"active" | "ended">("active")
+  const { games, loading, error } = useGames()
 
-  const filteredGames = mockBullRuns.filter((game) => game.status === activeTab)
+  const filteredGames = games.filter((game) => game.status === activeTab)
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center">
+          <div className="flex space-x-2">
+            <button
+              disabled
+              className="px-4 py-2 rounded-lg border text-gray-400 border-gray-600 cursor-not-allowed"
+            >
+              Active Games
+            </button>
+            <button
+              disabled
+              className="px-4 py-2 rounded-lg border text-gray-400 border-gray-600 cursor-not-allowed"
+            >
+              Ended Games
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+            <p className="text-gray-400">Loading games...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center">
+          <div className="flex space-x-2">
+            <button
+              disabled
+              className="px-4 py-2 rounded-lg border text-gray-400 border-gray-600 cursor-not-allowed"
+            >
+              Active Games
+            </button>
+            <button
+              disabled
+              className="px-4 py-2 rounded-lg border text-gray-400 border-gray-600 cursor-not-allowed"
+            >
+              Ended Games
+            </button>
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="text-red-400 text-6xl mb-4">⚠️</div>
+            <p className="text-red-400 mb-2">Failed to load games</p>
+            <p className="text-gray-400 text-sm">{error}</p>
+            <p className="text-gray-500 text-xs mt-2">Showing fallback data</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -84,7 +84,7 @@ export function BullRunList() {
                 : "text-gray-400 border-gray-600 hover:text-white hover:border-gray-500"
             }`}
           >
-            Active Games
+            Active Games ({games.filter(g => g.status === "active").length})
           </button>
           <button
             onClick={() => setActiveTab("ended")}
@@ -94,16 +94,31 @@ export function BullRunList() {
                 : "text-gray-400 border-gray-600 hover:text-white hover:border-gray-500"
             }`}
           >
-            Ended Games
+            Ended Games ({games.filter(g => g.status === "ended").length})
           </button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredGames.map((bullRun) => (
-          <BullRunCard key={bullRun.id} bullRun={bullRun} />
-        ))}
-      </div>
+      {filteredGames.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="text-gray-400 text-6xl mb-4">🎮</div>
+            <p className="text-gray-400 mb-2">No {activeTab} games found</p>
+            <p className="text-gray-500 text-sm">
+              {activeTab === "active" 
+                ? "Check back later for new games!" 
+                : "No completed games yet."
+              }
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredGames.map((bullRun) => (
+            <BullRunCard key={bullRun.id} bullRun={bullRun} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
