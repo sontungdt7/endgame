@@ -8,3 +8,5 @@ export function initializeZoraCoins(apiKey: string) {
 
 // Export the SDK for use in components
 export * from "@zoralabs/coins-sdk";
+
+

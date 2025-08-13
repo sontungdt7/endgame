@@ -11,6 +11,14 @@ export const metadata: Metadata = {
   title: "ViralPost", // Updated branding
   description: "Last buyer wins gaming platform", // Removed specific tagline
   generator: "v0.dev",
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' }
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({

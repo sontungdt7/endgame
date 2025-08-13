@@ -1,0 +1,38 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="6" fill="black"/>
+  
+  <!-- Neon V with glow effect -->
+  <defs>
+    <filter id="neon-glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <filter id="spark-glow">
+      <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+      <feMerge> 
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Left arm of V -->
+  <path d="M8 8 L16 20" stroke="#00BFFF" stroke-width="2" stroke-linecap="round" filter="url(#neon-glow)" opacity="0.8"/>
+  
+  <!-- Right arm of V (with gap) -->
+  <path d="M16 20 L20 12" stroke="#00BFFF" stroke-width="2" stroke-linecap="round" filter="url(#neon-glow)" opacity="0.8"/>
+  <path d="M20 12 L24 8" stroke="#00BFFF" stroke-width="2" stroke-linecap="round" filter="url(#neon-glow)" opacity="0.8"/>
+  
+  <!-- Sparks at top right -->
+  <circle cx="24" cy="8" r="0.5" fill="white" filter="url(#spark-glow)"/>
+  <circle cx="24.5" cy="7.5" r="0.3" fill="#00BFFF" filter="url(#spark-glow)"/>
+  
+  <!-- Viral Post text -->
+  <text x="16" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="6" fill="#CCCCCC">Viral Post</text>
+</svg>
+
+

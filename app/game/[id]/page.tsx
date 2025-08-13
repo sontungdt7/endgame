@@ -8,6 +8,9 @@ import { formatAddress, formatTimeAgo, formatBuyAmount } from "@/lib/utils"
 import { USDCBalance, useMaxBuyAmount } from "@/components/usdc-balance"
 import { PostCoinBalance } from "@/components/postcoin-balance"
 import { usePostCoinBalance } from "@/hooks/use-postcoin-balance"
+import { use0xSwapPrice } from "@/hooks/use-0x-swap"
+import { SwapPriceDisplay } from "@/components/swap-price-display"
+import { parseUnits, formatUnits } from "viem"
 
 export default function GameDetailPage({ params }: { params: Promise<{ id:string }> }) {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy")
@@ -21,6 +24,23 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
   const { balance: postCoinBalance } = usePostCoinBalance({ 
     postCoinAddress: game?.postCoin || "", 
     chainId: 8453 
+  })
+
+  // 0x Swap Price hooks
+  const buySwapPrice = use0xSwapPrice({
+    sellToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
+    buyToken: game?.postCoin || "",
+    sellAmount: buyAmount ? parseUnits(buyAmount, 6).toString() : "", // USDC has 6 decimals
+    chainId: "8453", // Base network
+    enabled: !!buyAmount && parseFloat(buyAmount) > 0 && !!game?.postCoin,
+  })
+
+  const sellSwapPrice = use0xSwapPrice({
+    sellToken: game?.postCoin || "",
+    buyToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC on Base
+    sellAmount: sellAmount ? parseUnits(sellAmount, 18).toString() : "", // PostCoin has 18 decimals
+    chainId: "8453", // Base network
+    enabled: !!sellAmount && parseFloat(sellAmount) > 0 && !!game?.postCoin,
   })
   
   const handlePercentageSell = (percentage: number) => {
@@ -327,6 +347,9 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         </div>
                       </div>
 
+                      {/* 0x Swap Price Display */}
+                      
+
                       {activeTab === "buy" ? (
                         <div className="grid grid-cols-4 gap-2 mb-4">
                           <button 
@@ -407,13 +430,75 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         <div className="flex justify-between items-center text-sm mb-4">
                           <span className="text-gray-400">Minimum received</span>
                           <div className="flex items-center space-x-1">
-                            <div className="w-4 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
-                              <span className="text-black text-xs font-bold">G</span>
-                            </div>
-                            <span className="text-white font-medium">4,606</span>
+                            {buySwapPrice.price ? (
+                              <>
+                                <div className="w-4 h-6 bg-blue-500 rounded-full flex items-center justify-center overflow-hidden">
+                                  {game.postThumbnail && game.postThumbnail !== "/placeholder.svg?height=200&width=300" ? (
+                                    <img 
+                                      src={game.postThumbnail} 
+                                      alt={game.symbol || "PostCoin"} 
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-black text-xs font-bold">
+                                      {game.symbol ? game.symbol.charAt(0).toUpperCase() : "P"}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-white font-medium">
+                                  {buySwapPrice.price.buyAmount ? 
+                                    Number(formatUnits(BigInt(buySwapPrice.price.buyAmount), 18)).toFixed(1) : 
+                                    '0.0'
+                                  } {game.symbol || "POST"}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-4 h-6 bg-gray-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs font-bold">?</span>
+                                </div>
+                                <span className="text-gray-400 font-medium">Loading...</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
+
+                      {activeTab === "sell" && (
+                        <div className="flex justify-between items-center text-sm mb-4">
+                          <span className="text-gray-400">You'll receive</span>
+                          <div className="flex items-center space-x-1">
+                            {sellSwapPrice.price ? (
+                              <>
+                                <div className="w-4 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                  <span className="text-black text-xs font-bold">U</span>
+                                </div>
+                                <span className="text-white font-medium">
+                                  {sellSwapPrice.price.buyAmount ? 
+                                    Number(formatUnits(BigInt(sellSwapPrice.price.buyAmount), 6)).toFixed(1) : 
+                                    '0.0'
+                                  } USDC
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-4 h-6 bg-gray-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs font-bold">?</span>
+                                </div>
+                                <span className="text-gray-400 font-medium">Loading...</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+
+
+
+
+
+
+
 
                       <div className="bg-gray-700 rounded-lg p-4">
                         <h3 className="text-lg font-bold mb-2">Game Rules</h3>
