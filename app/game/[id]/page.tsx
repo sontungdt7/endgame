@@ -6,13 +6,31 @@ import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
 import { useGame } from "@/hooks/useGame"
 import { formatAddress } from "@/lib/utils"
 import { USDCBalance, useMaxBuyAmount } from "@/components/usdc-balance"
+import { PostCoinBalance } from "@/components/postcoin-balance"
+import { usePostCoinBalance } from "@/hooks/use-postcoin-balance"
 
-export default function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function GameDetailPage({ params }: { params: Promise<{ id:string }> }) {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy")
   const [buyAmount, setBuyAmount] = useState("")
+  const [sellAmount, setSellAmount] = useState("")
   const { id } = use(params)
   const { game, loading, error } = useGame(id)
   const maxBuyAmount = useMaxBuyAmount()
+  
+  // Get PostCoin balance for percentage calculations
+  const { balance: postCoinBalance } = usePostCoinBalance({ 
+    postCoinAddress: game?.postCoin || "", 
+    chainId: 8453 
+  })
+  
+  const handlePercentageSell = (percentage: number) => {
+    const balance = parseFloat(postCoinBalance)
+    if (balance > 0 && game) {
+      const amount = (balance * percentage) / 100
+      setSellAmount(amount.toFixed(6)) // 6 decimal places for tokens
+      console.log(`Setting sell amount to ${amount.toFixed(6)} ${game.symbol || 'POST'} (${percentage}% of ${balance})`)
+    }
+  }
   
   // Show loading state
   if (loading) {
@@ -226,7 +244,11 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
                           {activeTab === "buy" ? (
                             <USDCBalance />
                           ) : (
-                            "273.52"
+                            <PostCoinBalance 
+                              postCoinAddress={game.postCoin} 
+                              chainId={8453}
+                              symbol={game.symbol}
+                            />
                           )}
                         </span>
                       </div>
@@ -241,10 +263,16 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
                       <div className="relative mb-4">
                         <input
                           type="number"
-                          value={activeTab === "buy" ? buyAmount : ""}
-                          onChange={(e) => activeTab === "buy" ? setBuyAmount(e.target.value) : undefined}
+                          value={activeTab === "buy" ? buyAmount : sellAmount}
+                          onChange={(e) => {
+                            if (activeTab === "buy") {
+                              setBuyAmount(e.target.value)
+                            } else {
+                              setSellAmount(e.target.value)
+                            }
+                          }}
                           placeholder={activeTab === "buy" ? "0.000111" : "0.0"}
-                          min={activeTab === "buy" ? game.minBuy : undefined}
+                          min={activeTab === "buy" ? game.minBuy : 0}
                           step="0.001"
                           className={`w-full bg-gray-800 border rounded-lg px-4 py-4 text-2xl font-bold text-white pr-20 ${
                             activeTab === "buy" && buyAmount && parseFloat(buyAmount) < game.minBuy
@@ -304,16 +332,28 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
                         </div>
                       ) : (
                         <div className="grid grid-cols-4 gap-2 mb-4">
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => handlePercentageSell(25)}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             25%
                           </button>
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => handlePercentageSell(50)}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             50%
                           </button>
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => handlePercentageSell(75)}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             75%
                           </button>
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => handlePercentageSell(100)}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             100%
                           </button>
                         </div>
@@ -325,7 +365,10 @@ export default function GameDetailPage({ params }: { params: Promise<{ id: strin
                             ? "bg-green-600 hover:bg-green-700 text-white"
                             : "bg-pink-600 hover:bg-pink-700 text-white"
                         }`}
-                        disabled={activeTab === "buy" && (!buyAmount || parseFloat(buyAmount) < game.minBuy)}
+                        disabled={
+                          (activeTab === "buy" && (!buyAmount || parseFloat(buyAmount) < game.minBuy)) ||
+                          (activeTab === "sell" && (!sellAmount || parseFloat(sellAmount) <= 0))
+                        }
                       >
                         {activeTab === "buy" ? "Buy" : "Sell"}
                       </button>
