@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "BullRun Games", // Removed ViralPost.Fun branding
+  title: "ViralPost", // Updated branding
   description: "Last buyer wins gaming platform", // Removed specific tagline
   generator: "v0.dev",
 }

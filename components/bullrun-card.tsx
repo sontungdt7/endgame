@@ -159,9 +159,11 @@ export function BullRunCard({ bullRun }: BullRunCardProps) {
             </Button>
           </Link>
         ) : (
-          <Button className="w-full font-semibold bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black">
-            View Game
-          </Button>
+          <Link href={`/game/${bullRun.id}`} className="w-full">
+            <Button className="w-full font-semibold bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black">
+              View Game
+            </Button>
+          </Link>
         )}
       </CardFooter>
     </Card>
