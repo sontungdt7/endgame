@@ -3,58 +3,52 @@
 import { useState } from "react"
 import { GameHeader } from "@/components/game-header"
 import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
-
-// Mock data - in real app this would come from API/blockchain
-const getMockGameData = (id: string) => {
-  const gameId = Number.parseInt(id)
-  const isEnded = gameId % 2 === 0 // Even IDs are ended games
-  const hasPlayers = gameId !== 4 // Game 4 has no players for refund scenario
-
-  if (isEnded) {
-    return {
-      id,
-      postTitle: "Epic NFT Collection Launch",
-      postContent:
-        "Discover the most innovative NFT collection that's revolutionizing digital art. Join thousands of collectors in this groundbreaking project.",
-      postCoinAddress: "0x1234567890abcdef1234567890abcdef12345678",
-      postThumbnail: "/placeholder.svg?height=400&width=600",
-      prizePool: 500,
-      timeLeft: 0,
-      lastBuyer: hasPlayers ? "alice.eth" : null,
-      lastBuyerAddress: hasPlayers ? "0xabcd...1234" : null,
-      minBuy: 1.2,
-      totalBuyers: hasPlayers ? 23 : 0,
-      status: "ended" as const,
-      winner: hasPlayers ? "alice.eth" : null,
-      currentUser: "bob.eth", // Mock current user
-    }
-  }
-
-  return {
-    id,
-    postTitle: "Epic NFT Collection Launch",
-    postContent:
-      "Discover the most innovative NFT collection that's revolutionizing digital art. Join thousands of collectors in this groundbreaking project.",
-    postCoinAddress: "0x1234567890abcdef1234567890abcdef12345678",
-    postThumbnail: "/placeholder.svg?height=400&width=600",
-    prizePool: 500,
-    timeLeft: 8640, // seconds
-    lastBuyer: "alice.eth",
-    lastBuyerAddress: "0xabcd...1234",
-    minBuy: 1.2,
-    totalBuyers: 23,
-    status: "active" as const,
-    winner: null,
-    currentUser: "bob.eth", // Mock current user
-  }
-}
+import { useGame } from "@/hooks/useGame"
+import { formatAddress } from "@/lib/utils"
 
 export default function GameDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy")
-  const mockGameData = getMockGameData(params.id)
-  const isEnded = mockGameData.status === "ended"
-  const isWinner = isEnded && mockGameData.winner === mockGameData.currentUser
-  const hasNoPlayers = isEnded && mockGameData.totalBuyers === 0
+  const { game, loading, error } = useGame(params.id)
+  
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <GameHeader />
+        <main className="container mx-auto px-4 py-6 max-w-7xl">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-500 mx-auto mb-4"></div>
+              <p className="text-gray-400 text-lg">Loading game details...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error || !game) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <GameHeader />
+        <main className="container mx-auto px-4 py-6 max-w-7xl">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="text-red-400 text-6xl mb-4">⚠️</div>
+              <p className="text-red-400 mb-2">Failed to load game</p>
+              <p className="text-gray-400 text-sm">{error || 'Game not found'}</p>
+              <p className="text-gray-500 text-xs mt-2">Please check the game ID and try again</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  const isEnded = game.status === "ended"
+  const isWinner = isEnded && game.lastBuyer === "0x1234567890abcdef1234567890abcdef12345678" // Mock current user for now
+  const hasNoPlayers = isEnded && game.totalBuyCount === 0
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -66,13 +60,13 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <img
-                src={mockGameData.postThumbnail || "/placeholder.svg"}
+                src={game.postThumbnail || "/placeholder.svg"}
                 alt="Game thumbnail"
                 className="w-12 h-12 rounded-lg object-cover"
               />
               <div>
                 <div className="flex items-center space-x-2">
-                  <h1 className="text-xl font-bold text-white">GAME #{mockGameData.id}</h1>
+                  <h1 className="text-xl font-bold text-white">GAME #{game.gameId}</h1>
                   <span className="text-gray-400">•</span>
                   <span className="text-gray-400 text-sm">Last Buyer Wins</span>
                   {isEnded && (
@@ -82,11 +76,14 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
                     </>
                   )}
                 </div>
-                <p className="text-gray-400 text-sm">{mockGameData.postTitle}</p>
+                <p className="text-gray-400 text-sm">{game.postTitle}</p>
+                {game.symbol && (
+                  <p className="text-gray-500 text-xs">Symbol: {game.symbol}</p>
+                )}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold text-green-400">${mockGameData.prizePool}</div>
+              <div className="text-3xl font-bold text-green-400">${game.prizePool.toFixed(2)}</div>
               <div className="text-sm text-gray-400">USDC Prize Pool</div>
             </div>
           </div>
@@ -100,22 +97,22 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
               <div>
                 <div className="text-sm text-gray-400">Time Left</div>
                 <div className={`text-lg font-bold ${isEnded ? "text-red-400" : "text-orange-400"}`}>
-                  {isEnded ? "Ended" : "2h 24m 15s"}
+                  {isEnded ? "Ended" : game.timeLeft}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-gray-400">{isEnded ? "Winner" : "Last Buyer"}</div>
                 <div className="text-lg font-bold text-blue-400">
-                  {isEnded ? mockGameData.winner || "No Winner" : mockGameData.lastBuyer}
+                  {isEnded ? (game.lastBuyer ? formatAddress(game.lastBuyer) : "No Winner") : formatAddress(game.lastBuyer)}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-gray-400">Total Players</div>
-                <div className="text-lg font-bold text-purple-400">{mockGameData.totalBuyers}</div>
+                <div className="text-lg font-bold text-purple-400">{game.totalBuyCount}</div>
               </div>
               <div>
                 <div className="text-sm text-gray-400">Min Buy</div>
-                <div className="text-lg font-bold text-yellow-400">${mockGameData.minBuy}</div>
+                <div className="text-lg font-bold text-yellow-400">${game.minBuy.toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -126,15 +123,25 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
               {/* Post Preview */}
               <div className="lg:col-span-2">
                 <img
-                  src={mockGameData.postThumbnail || "/placeholder.svg"}
+                  src={game.postThumbnail || "/placeholder.svg"}
                   alt="Post preview"
                   className="w-full h-64 object-cover rounded-lg mb-4"
                 />
-                <h2 className="text-xl font-bold mb-2">{mockGameData.postTitle}</h2>
-                <p className="text-gray-300 mb-4">{mockGameData.postContent}</p>
-                <div className="text-sm text-gray-400">
-                  PostCoin: <span className="font-mono">{mockGameData.postCoinAddress}</span>
+                <h2 className="text-xl font-bold mb-2">{game.postTitle}</h2>
+                <p className="text-gray-300 mb-4">
+                  {game.description || "Discover the most innovative NFT collection that's revolutionizing digital art. Join thousands of collectors in this groundbreaking project."}
+                </p>
+                <div className="text-sm text-gray-400 mb-2">
+                  PostCoin: <span className="font-mono">{formatAddress(game.postCoin)}</span>
                 </div>
+                <div className="text-sm text-gray-400">
+                  Sponsored by: <span className="font-mono">{formatAddress(game.sponsor)}</span>
+                </div>
+                {game.symbol && (
+                  <div className="text-sm text-gray-400 mt-2">
+                    Token Symbol: <span className="font-mono">{game.symbol}</span>
+                  </div>
+                )}
               </div>
 
               {/* Action Panel */}
@@ -149,7 +156,7 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
                           <p className="text-gray-300 text-sm mb-4">No players joined this game</p>
                         ) : (
                           <p className="text-gray-300 text-sm mb-4">
-                            Winner: <span className="text-blue-400 font-medium">{mockGameData.winner}</span>
+                            Winner: <span className="text-blue-400 font-medium">{formatAddress(game.lastBuyer)}</span>
                           </p>
                         )}
                       </div>
@@ -174,10 +181,12 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
                       <div className="bg-gray-700 rounded-lg p-4">
                         <h3 className="text-lg font-bold mb-2">Game Results</h3>
                         <ul className="text-sm text-gray-300 space-y-1">
-                          <li>• Prize Pool: ${mockGameData.prizePool} USDC</li>
-                          <li>• Total Players: {mockGameData.totalBuyers}</li>
-                          {mockGameData.winner && <li>• Winner: {mockGameData.winner}</li>}
+                          <li>• Prize Pool: ${game.prizePool.toFixed(2)} USDC</li>
+                          <li>• Total Players: {game.totalBuyCount}</li>
+                          {game.lastBuyer && <li>• Winner: {formatAddress(game.lastBuyer)}</li>}
                           {hasNoPlayers && <li>• Refund available to sponsor</li>}
+                          <li>• Final Phase Buy Count: {game.finalPhaseBuyCount}</li>
+                          <li>• Game Status: {game.claimed ? "Prize Claimed" : "Prize Available"}</li>
                         </ul>
                       </div>
                     </div>
@@ -330,8 +339,8 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
                   <td className="p-3 text-sm">
                     <span className="text-green-400 font-medium">BUY</span>
                   </td>
-                  <td className="p-3 text-sm text-white font-medium">$2.50</td>
-                  <td className="p-3 text-sm text-blue-400">alice.eth</td>
+                  <td className="p-3 text-sm text-white font-medium">${game.minBuy.toFixed(2)}</td>
+                  <td className="p-3 text-sm text-blue-400">{formatAddress(game.lastBuyer)}</td>
                   <td className="p-3 text-sm">
                     <a href="#" className="text-gray-400 hover:text-white font-mono text-xs">
                       0x1234...5678
@@ -343,8 +352,8 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
                   <td className="p-3 text-sm">
                     <span className="text-green-400 font-medium">BUY</span>
                   </td>
-                  <td className="p-3 text-sm text-white font-medium">$2.00</td>
-                  <td className="p-3 text-sm text-blue-400">bob.eth</td>
+                  <td className="p-3 text-sm text-white font-medium">${(game.minBuy * 0.8).toFixed(2)}</td>
+                  <td className="p-3 text-sm text-blue-400">{formatAddress(game.sponsor)}</td>
                   <td className="p-3 text-sm">
                     <a href="#" className="text-gray-400 hover:text-white font-mono text-xs">
                       0xabcd...efgh
@@ -356,8 +365,8 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
                   <td className="p-3 text-sm">
                     <span className="text-green-400 font-medium">BUY</span>
                   </td>
-                  <td className="p-3 text-sm text-white font-medium">$1.50</td>
-                  <td className="p-3 text-sm text-blue-400">charlie.eth</td>
+                  <td className="p-3 text-sm text-white font-medium">${(game.minBuy * 0.6).toFixed(2)}</td>
+                  <td className="p-3 text-sm text-blue-400">{formatAddress(game.postCoin)}</td>
                   <td className="p-3 text-sm">
                     <a href="#" className="text-gray-400 hover:text-white font-mono text-xs">
                       0x9876...5432

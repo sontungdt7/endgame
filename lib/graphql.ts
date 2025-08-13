@@ -20,23 +20,35 @@ export const GAME_CREATEDS_QUERY = `
   }
 `
 
-// GraphQL query for individual game details
+// GraphQL query for individual game details - using gameCreateds with filter
 export const GAME_DETAILS_QUERY = `
   query GetGame($gameId: String!) {
-    game(id: $gameId) {
+    gameCreateds(where: { gameId: $gameId }, first: 1, orderBy: blockNumber, orderDirection: desc) {
       id
       gameId
       sponsor
       postCoin
       prizePool
-      startTime
-      endTime
-      lastBuyer
-      claimed
-      refunded
-      finalPhaseBuyCount
-      totalBuyCount
-      hasPlayer
+      blockNumber
+      blockTimestamp
+      transactionHash
+    }
+  }
+`
+
+// Debug query to see what's available
+export const DEBUG_QUERY = `
+  query {
+    __schema {
+      types {
+        name
+        fields {
+          name
+          type {
+            name
+          }
+        }
+      }
     }
   }
 `
