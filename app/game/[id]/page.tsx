@@ -1,14 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useState, use } from "react"
 import { GameHeader } from "@/components/game-header"
 import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
 import { useGame } from "@/hooks/useGame"
 import { formatAddress } from "@/lib/utils"
+import { USDCBalance, useMaxBuyAmount } from "@/components/usdc-balance"
 
-export default function GameDetailPage({ params }: { params: { id: string } }) {
+export default function GameDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy")
-  const { game, loading, error } = useGame(params.id)
+  const [buyAmount, setBuyAmount] = useState("")
+  const { id } = use(params)
+  const { game, loading, error } = useGame(id)
+  const maxBuyAmount = useMaxBuyAmount()
   
   // Show loading state
   if (loading) {
@@ -218,16 +222,41 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
 
                       <div className="flex justify-between items-center mb-4">
                         <span className="text-gray-400 text-sm">Balance</span>
-                        <span className="text-white font-medium">{activeTab === "buy" ? "0 USDC" : "273.52"}</span>
+                        <span className="text-white font-medium">
+                          {activeTab === "buy" ? (
+                            <USDCBalance />
+                          ) : (
+                            "273.52"
+                          )}
+                        </span>
                       </div>
+                      
+                      {activeTab === "buy" && (
+                        <div className="text-xs text-gray-500 mb-4">
+                          Minimum buy: {game.minBuy.toFixed(2)} USDC
+                        </div>
+                      )}
 
                       {/* Amount Input */}
                       <div className="relative mb-4">
                         <input
                           type="number"
+                          value={activeTab === "buy" ? buyAmount : ""}
+                          onChange={(e) => activeTab === "buy" ? setBuyAmount(e.target.value) : undefined}
                           placeholder={activeTab === "buy" ? "0.000111" : "0.0"}
-                          className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-4 text-2xl font-bold text-white pr-20"
+                          min={activeTab === "buy" ? game.minBuy : undefined}
+                          step="0.001"
+                          className={`w-full bg-gray-800 border rounded-lg px-4 py-4 text-2xl font-bold text-white pr-20 ${
+                            activeTab === "buy" && buyAmount && parseFloat(buyAmount) < game.minBuy
+                              ? "border-red-500"
+                              : "border-gray-600"
+                          }`}
                         />
+                        {activeTab === "buy" && buyAmount && parseFloat(buyAmount) < game.minBuy && (
+                          <div className="text-red-400 text-sm mt-1">
+                            Amount must be at least {game.minBuy.toFixed(2)} USDC
+                          </div>
+                        )}
                         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
                           {activeTab === "sell" && (
                             <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
@@ -248,16 +277,28 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
 
                       {activeTab === "buy" ? (
                         <div className="grid grid-cols-4 gap-2 mb-4">
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => setBuyAmount("1")}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             1 USDC
                           </button>
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => setBuyAmount("5")}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             5 USDC
                           </button>
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => setBuyAmount("10")}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             10 USDC
                           </button>
-                          <button className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium">
+                          <button 
+                            onClick={() => setBuyAmount(maxBuyAmount)}
+                            className="bg-gray-600 hover:bg-gray-500 text-white py-2 px-3 rounded text-sm font-medium"
+                          >
                             Max
                           </button>
                         </div>
@@ -284,6 +325,7 @@ export default function GameDetailPage({ params }: { params: { id: string } }) {
                             ? "bg-green-600 hover:bg-green-700 text-white"
                             : "bg-pink-600 hover:bg-pink-700 text-white"
                         }`}
+                        disabled={activeTab === "buy" && (!buyAmount || parseFloat(buyAmount) < game.minBuy)}
                       >
                         {activeTab === "buy" ? "Buy" : "Sell"}
                       </button>

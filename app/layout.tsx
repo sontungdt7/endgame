@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { PrivyProviderWrapper } from "@/components/privy-provider"
+import { WagmiProvider } from "@/components/wagmi-provider"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
@@ -29,10 +30,12 @@ html {
         `}</style>
       </head>
       <body className="bg-gray-900 text-white antialiased">
-        <PrivyProviderWrapper>
-          {children}
-          <Toaster />
-        </PrivyProviderWrapper>
+        <WagmiProvider>
+          <PrivyProviderWrapper>
+            {children}
+            <Toaster />
+          </PrivyProviderWrapper>
+        </WagmiProvider>
       </body>
     </html>
   )
