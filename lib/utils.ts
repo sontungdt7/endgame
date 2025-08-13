@@ -45,6 +45,33 @@ export function formatAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
+// Format time ago from block timestamp
+export function formatTimeAgo(timestamp: string | number): string {
+  const now = Math.floor(Date.now() / 1000)
+  const blockTime = typeof timestamp === 'string' ? parseInt(timestamp) : timestamp
+  const timeDiff = now - blockTime
+  
+  if (timeDiff < 60) {
+    return `${timeDiff}s ago`
+  } else if (timeDiff < 3600) {
+    const minutes = Math.floor(timeDiff / 60)
+    return `${minutes}m ago`
+  } else if (timeDiff < 86400) {
+    const hours = Math.floor(timeDiff / 3600)
+    return `${hours}h ago`
+  } else {
+    const days = Math.floor(timeDiff / 86400)
+    return `${days}d ago`
+  }
+}
+
+// Format USDC amount from buy events (assuming 6 decimals)
+export function formatBuyAmount(amount: string | number): string {
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount
+  const usdcAmount = numAmount / 1e6
+  return `$${usdcAmount.toFixed(2)}`
+}
+
 // Generate mock post title based on game ID
 export function generateMockPostTitle(gameId: string): string {
   const titles = [

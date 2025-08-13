@@ -4,7 +4,7 @@ import { useState, use } from "react"
 import { GameHeader } from "@/components/game-header"
 import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
 import { useGame } from "@/hooks/useGame"
-import { formatAddress } from "@/lib/utils"
+import { formatAddress, formatTimeAgo, formatBuyAmount } from "@/lib/utils"
 import { USDCBalance, useMaxBuyAmount } from "@/components/usdc-balance"
 import { PostCoinBalance } from "@/components/postcoin-balance"
 import { usePostCoinBalance } from "@/hooks/use-postcoin-balance"
@@ -125,11 +125,12 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
               <div>
                 <div className="text-sm text-gray-400">{isEnded ? "Winner" : "Last Buyer"}</div>
                 <div className="text-lg font-bold text-blue-400">
-                  {isEnded ? (game.lastBuyer ? formatAddress(game.lastBuyer) : "No Winner") : formatAddress(game.lastBuyer)}
+                  {isEnded ? (game.lastBuyer ? formatAddress(game.lastBuyer) : "No Winner") : 
+                    (game.lastBuyer === "0x0000000000000000000000000000000000000000" ? "No Buyers Yet" : formatAddress(game.lastBuyer))}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-400">Total Players</div>
+                <div className="text-sm text-gray-400">Total Play</div>
                 <div className="text-lg font-bold text-purple-400">{game.totalBuyCount}</div>
               </div>
               <div>
@@ -159,11 +160,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                 <div className="text-sm text-gray-400">
                   Sponsored by: <span className="font-mono">{formatAddress(game.sponsor)}</span>
                 </div>
-                {game.symbol && (
-                  <div className="text-sm text-gray-400 mt-2">
-                    Token Symbol: <span className="font-mono">{game.symbol}</span>
-                  </div>
-                )}
+                
               </div>
 
               {/* Action Panel */}
@@ -178,7 +175,9 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                           <p className="text-gray-300 text-sm mb-4">No players joined this game</p>
                         ) : (
                           <p className="text-gray-300 text-sm mb-4">
-                            Winner: <span className="text-blue-400 font-medium">{formatAddress(game.lastBuyer)}</span>
+                            Winner: <span className="text-blue-400 font-medium">
+                              {game.lastBuyer === "0x0000000000000000000000000000000000000000" ? "No Winner" : formatAddress(game.lastBuyer)}
+                            </span>
                           </p>
                         )}
                       </div>
@@ -205,7 +204,9 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         <ul className="text-sm text-gray-300 space-y-1">
                           <li>• Prize Pool: ${game.prizePool.toFixed(2)} USDC</li>
                           <li>• Total Players: {game.totalBuyCount}</li>
-                          {game.lastBuyer && <li>• Winner: {formatAddress(game.lastBuyer)}</li>}
+                          {game.lastBuyer && game.lastBuyer !== "0x0000000000000000000000000000000000000000" && (
+                            <li>• Winner: {formatAddress(game.lastBuyer)}</li>
+                          )}
                           {hasNoPlayers && <li>• Refund available to sponsor</li>}
                           <li>• Final Phase Buy Count: {game.finalPhaseBuyCount}</li>
                           <li>• Game Status: {game.claimed ? "Prize Claimed" : "Prize Available"}</li>
@@ -434,61 +435,55 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
         {/* Transactions Table */}
         <div className="bg-gray-800 rounded-lg border border-gray-700">
           <div className="p-4 border-b border-gray-700">
-            <h2 className="text-lg font-bold">Recent Activity</h2>
+            <h2 className="text-lg font-bold">Recent Buy</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-700">
-                <tr>
-                  <th className="text-left p-3 text-sm font-medium text-gray-300">Time</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-300">Type</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-300">Amount</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-300">From</th>
-                  <th className="text-left p-3 text-sm font-medium text-gray-300">TX</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                <tr className="hover:bg-gray-700/50">
-                  <td className="p-3 text-sm text-gray-300">2m ago</td>
-                  <td className="p-3 text-sm">
-                    <span className="text-green-400 font-medium">BUY</span>
-                  </td>
-                  <td className="p-3 text-sm text-white font-medium">${game.minBuy.toFixed(2)}</td>
-                  <td className="p-3 text-sm text-blue-400">{formatAddress(game.lastBuyer)}</td>
-                  <td className="p-3 text-sm">
-                    <a href="#" className="text-gray-400 hover:text-white font-mono text-xs">
-                      0x1234...5678
-                    </a>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-700/50">
-                  <td className="p-3 text-sm text-gray-300">5m ago</td>
-                  <td className="p-3 text-sm">
-                    <span className="text-green-400 font-medium">BUY</span>
-                  </td>
-                  <td className="p-3 text-sm text-white font-medium">${(game.minBuy * 0.8).toFixed(2)}</td>
-                  <td className="p-3 text-sm text-blue-400">{formatAddress(game.sponsor)}</td>
-                  <td className="p-3 text-sm">
-                    <a href="#" className="text-gray-400 hover:text-white font-mono text-xs">
-                      0xabcd...efgh
-                    </a>
-                  </td>
-                </tr>
-                <tr className="hover:bg-gray-700/50">
-                  <td className="p-3 text-sm text-gray-300">8m ago</td>
-                  <td className="p-3 text-sm">
-                    <span className="text-green-400 font-medium">BUY</span>
-                  </td>
-                  <td className="p-3 text-sm text-white font-medium">${(game.minBuy * 0.6).toFixed(2)}</td>
-                  <td className="p-3 text-sm text-blue-400">{formatAddress(game.postCoin)}</td>
-                  <td className="p-3 text-sm">
-                    <a href="#" className="text-gray-400 hover:text-white font-mono text-xs">
-                      0x9876...5432
-                    </a>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {game.buyEvents && game.buyEvents.length > 0 ? (
+              <table className="w-full">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="text-left p-3 text-sm font-medium text-gray-300">Time</th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-300">Type</th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-300">Amount</th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-300">From</th>
+                    <th className="text-left p-3 text-sm font-medium text-gray-300">TX</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {game.buyEvents.map((buyEvent, index) => (
+                    <tr key={buyEvent.id} className="hover:bg-gray-700/50">
+                      <td className="p-3 text-sm text-gray-300">
+                        {formatTimeAgo(buyEvent.blockTimestamp)}
+                      </td>
+                      <td className="p-3 text-sm">
+                        <span className="text-green-400 font-medium">BUY</span>
+                      </td>
+                      <td className="p-3 text-sm text-white font-medium">
+                        {formatBuyAmount(buyEvent.amount)}
+                      </td>
+                      <td className="p-3 text-sm text-blue-400">
+                        {formatAddress(buyEvent.buyer)}
+                      </td>
+                      <td className="p-3 text-sm">
+                        <a 
+                          href={`https://basescan.org/tx/${buyEvent.transactionHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gray-400 hover:text-white font-mono text-xs"
+                        >
+                          {formatAddress(buyEvent.transactionHash)}
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-8 text-center">
+                <div className="text-gray-400 text-lg mb-2">No Buy Events Yet</div>
+                <div className="text-gray-500 text-sm">This game hasn't had any buyers yet. Be the first to join!</div>
+              </div>
+            )}
           </div>
         </div>
       </main>

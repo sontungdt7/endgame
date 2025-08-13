@@ -52,3 +52,19 @@ export const DEBUG_QUERY = `
     }
   }
 `
+
+// GraphQL query for game state data - including lastBuyer and totalBuyCount
+export const GAME_STATE_QUERY = `
+  query GetGameState($gameId: String!) {
+    buyPostCoins(where: { gameId: $gameId }, orderBy: blockTimestamp, orderDirection: desc) {
+      id
+      gameId
+      buyer
+      amount
+      newEndTime
+      blockNumber
+      blockTimestamp
+      transactionHash
+    }
+  }
+`

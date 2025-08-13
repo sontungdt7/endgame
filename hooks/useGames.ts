@@ -36,6 +36,7 @@ export interface TransformedGame {
   endTime: number
   totalBuyCount: number
   hasPlayer: boolean
+  description?: string
 }
 
 interface GraphQLResponse {
