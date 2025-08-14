@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Trophy, User, Crown, Clock, Wallet, Image as ImageIcon } from "lucide-react"
+import { Trophy, User, Crown, Clock, Image as ImageIcon } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
@@ -102,13 +102,7 @@ export function BullRunCard({ bullRun }: BullRunCardProps) {
                 </span>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Wallet className="w-4 h-4 text-purple-400" />
-                  <span className="text-sm text-gray-400">Min Buy</span>
-                </div>
-                <span className="font-semibold text-purple-400">{bullRun.minBuy.toFixed(2)} USDC</span>
-              </div>
+
             </>
           ) : (
             <>
