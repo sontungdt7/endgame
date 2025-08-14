@@ -527,27 +527,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                             100%
                           </button>
                         </div>
-                      )}
-                      
-                      {activeTab === "sell" && (
-                        <div className="text-xs text-gray-500 mb-4 text-center">
-                          Selling {game.symbol || "POST"} tokens
-                        </div>
-                      )}
-
-                      <button
-                        className={`w-full font-bold py-3 rounded-lg transition-colors mb-4 ${
-                          activeTab === "buy"
-                            ? "bg-green-600 hover:bg-green-700 text-white"
-                            : "bg-pink-600 hover:bg-pink-700 text-white"
-                        }`}
-                        disabled={
-                          (activeTab === "buy" && (!buyAmount || parseFloat(buyAmount) < game.minBuy)) ||
-                          (activeTab === "sell" && (!sellAmount || parseFloat(sellAmount) <= 0))
-                        }
-                      >
-                        {activeTab === "buy" ? "Buy" : "Sell"}
-                      </button>
+                      )}                                                            
 
                       {activeTab === "buy" && (
                         <div className="flex justify-between items-center text-sm mb-4">
@@ -615,6 +595,20 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         </div>
                       )}
 
+                      <button
+                        className={`w-full font-bold py-3 rounded-lg transition-colors ${
+                          activeTab === "buy"
+                            ? "bg-green-600 hover:bg-green-700 text-white"
+                            : "bg-pink-600 hover:bg-pink-700 text-white"
+                        }`}
+                        disabled={
+                          (activeTab === "buy" && (!buyAmount || parseFloat(buyAmount) < game.minBuy)) ||
+                          (activeTab === "sell" && (!sellAmount || parseFloat(sellAmount) <= 0))
+                        }
+                      >
+                        {activeTab === "buy" ? "Buy" : "Sell"}
+                      </button>
+
 
 
 
@@ -626,7 +620,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                       <div className="bg-gray-700 rounded-lg p-4">
                         <h3 className="text-lg font-bold mb-2">Game Rules</h3>
                         <ul className="text-sm text-gray-300 space-y-1">
-                          <li>• Last buyer wins the entire prize pool</li>
+                          <li>• Last buyer before the timer hits zero wins the USDC prize.</li>
                           <li>• Each buy extends timer by 30 seconds</li>
                           <li>• Minimum buy increases with each purchase</li>
                           <li>• Winner can claim prize when timer ends</li>
