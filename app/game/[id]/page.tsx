@@ -24,7 +24,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
   const maxBuyAmount = useMaxBuyAmount()
   
   // BullRun contract hook for refund functionality
-  const { refundPrizePool, isLoading: isRefundLoading, isRefundSuccess, isRefundPending, error: refundError } = useBullRunContract()
+  const { refundPrizePool, claimPrize, isLoading: isRefundLoading, isRefundSuccess, isRefundPending, isClaimPrizeSuccess, isClaimPrizePending, isClaimPrizeLoading, error: refundError, error: claimPrizeError } = useBullRunContract()
   
   // Get PostCoin balance for percentage calculations
   const { balance: postCoinBalance } = usePostCoinBalance({ 
@@ -40,18 +40,6 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
   // Calculate game state variables
   const isEnded = game?.status === "ended"
   const hasNoPlayers = isEnded && game?.totalBuyCount === 0
-
-  // Debug logging
-  console.log('Refund Debug Info:', {
-    currentUserAddress,
-    gameSponsor: game?.sponsor,
-    isSponsor,
-    hasNoPlayers,
-    gameRefunded: game?.refunded,
-    gameStatus: game?.status,
-    totalBuyCount: game?.totalBuyCount,
-    userConnected: !!currentUserAddress
-  })
 
   // 0x Swap Price hooks
   const buySwapPrice = use0xSwapPrice({
@@ -103,7 +91,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
       return
     }
 
-    if (game.refunded || isRefundSuccess) {
+    if (isRefunded || isRefundSuccess) {
       console.log('Game already refunded')
       toast.error('This game has already been refunded')
       return
@@ -124,6 +112,51 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
     }
   }
 
+  // Handle claim prize
+  const handleClaimPrize = async () => {
+    console.log('Claim prize button clicked!')
+    console.log('Game data:', game)
+    console.log('Current user address:', currentUserAddress)
+    
+    if (!game) {
+      console.log('No game data available')
+      toast.error('No game data available')
+      return
+    }
+
+    if (!currentUserAddress) {
+      console.log('No user address available')
+      toast.error('Please connect your wallet first')
+      return
+    }
+
+    if (!isWinner) {
+      console.log('User is not the winner')
+      toast.error('Only the game winner can claim the prize')
+      return
+    }
+
+    if (isClaimed) {
+      console.log('Prize already claimed on blockchain')
+      toast.error('This prize has already been claimed')
+      return
+    }
+
+    try {
+      console.log('Calling claimPrize with game ID:', game.gameId)
+      const result = await claimPrize(parseInt(game.gameId))
+      
+      console.log('Claim prize result:', result)
+      
+      if (result?.success) {
+        toast.success("Claim prize transaction submitted! Waiting for confirmation...")
+      }
+    } catch (error) {
+      console.error("Failed to claim prize:", error)
+      toast.error(`Failed to claim prize: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   // Handle refund success
   if (isRefundSuccess) {
     toast.success("🎉 Prize pool refunded successfully!")
@@ -132,6 +165,16 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
   // Handle refund errors
   if (refundError) {
     toast.error(`Refund Error: ${refundError}`)
+  }
+
+  // Handle claim prize success
+  if (isClaimPrizeSuccess) {
+    toast.success("🏆 Prize claimed successfully!")
+  }
+
+  // Handle claim prize errors
+  if (claimPrizeError) {
+    toast.error(`Claim Prize Error: ${claimPrizeError}`)
   }
   
   // Show loading state
@@ -170,7 +213,53 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
     )
   }
 
-  const isWinner = isEnded && game.lastBuyer === "0x1234567890abcdef1234567890abcdef12345678" // Mock current user for now
+  const isWinner = isEnded && currentUserAddress && game.lastBuyer && 
+    game.lastBuyer.toLowerCase() === currentUserAddress.toLowerCase()
+
+  // Get real-time status from blockchain, fallback to GraphQL data
+  const isRefunded = game?.blockchainRefunded !== undefined ? game.blockchainRefunded : game?.refunded
+  const isClaimed = game?.blockchainClaimed !== undefined ? game.blockchainClaimed : game?.claimed
+
+  // Debug logging for refund and claim prize
+  console.log('Refund Debug Info:', {
+    currentUserAddress,
+    gameSponsor: game?.sponsor,
+    isSponsor,
+    hasNoPlayers,
+    gameRefunded: game?.refunded,
+    blockchainRefunded: game?.blockchainRefunded,
+    isRefunded,
+    gameStatus: game?.status,
+    totalBuyCount: game?.totalBuyCount,
+    userConnected: !!currentUserAddress
+  })
+
+  console.log('Claim Prize Debug Info:', {
+    currentUserAddress,
+    gameLastBuyer: game?.lastBuyer,
+    hasNoPlayers,
+    isClaimPrizeSuccess,
+    isClaimPrizePending,
+    isClaimPrizeLoading,
+    gameClaimed: game?.claimed,
+    blockchainClaimed: game?.blockchainClaimed,
+    isClaimed,
+    isWinner,
+    isEnded,
+    buttonDisabled: !isWinner || isClaimed || isClaimPrizePending || isClaimPrizeLoading,
+    buttonText: isClaimPrizeLoading || isClaimPrizePending 
+      ? "Loading..." 
+      : isClaimed 
+        ? "🏆 Prize Claimed" 
+        : isWinner 
+          ? "Claim Prize" 
+          : "Not Winner",
+    // Address comparison debugging
+    normalizedCurrentUser: currentUserAddress?.toLowerCase(),
+    normalizedLastBuyer: game?.lastBuyer?.toLowerCase(),
+    addressMatch: currentUserAddress && game?.lastBuyer ? 
+      currentUserAddress.toLowerCase() === game.lastBuyer.toLowerCase() : false
+  })
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -406,7 +495,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                       </div>
 
                       {hasNoPlayers ? (
-                        game.refunded || isRefundSuccess ? (
+                        isRefunded || isRefundSuccess ? (
                           <div className="text-center p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
                             <p className="text-green-400 text-sm font-medium">Prize Pool Refunded</p>
                             <p className="text-green-300 text-xs mt-1">
@@ -426,9 +515,9 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         ) : isSponsor ? (
                           <button 
                             onClick={handleRefundPrizePool}
-                            disabled={isRefundLoading || isRefundPending || game.refunded || isRefundSuccess}
+                            disabled={isRefundLoading || isRefundPending || isRefunded || isRefundSuccess}
                             className={`w-full font-bold py-3 rounded-lg transition-colors ${
-                              isRefundLoading || isRefundPending || game.refunded || isRefundSuccess
+                              isRefundLoading || isRefundPending || isRefunded || isRefundSuccess
                                 ? "bg-gray-600 text-gray-400 cursor-not-allowed" 
                                 : "bg-yellow-600 hover:bg-yellow-700 text-white"
                             }`}
@@ -440,7 +529,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                                   {isRefundPending ? "Refund Pending..." : "Processing Refund..."}
                                 </span>
                               </div>
-                            ) : game.refunded || isRefundSuccess ? (
+                            ) : isRefunded || isRefundSuccess ? (
                               "Already Refunded"
                             ) : (
                               "Refund Prize Pool"
@@ -461,14 +550,28 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         )
                       ) : (
                         <button
+                          onClick={handleClaimPrize}
+                          disabled={!isWinner || isClaimed || isClaimPrizePending || isClaimPrizeLoading}
                           className={`w-full font-bold py-3 rounded-lg transition-colors ${
-                            isWinner
+                            isWinner && !isClaimed && !isClaimPrizePending && !isClaimPrizeLoading
                               ? "bg-green-600 hover:bg-green-700 text-white"
                               : "bg-gray-600 text-gray-400 cursor-not-allowed"
                           }`}
-                          disabled={!isWinner}
                         >
-                          {isWinner ? "Claim Prize" : "Prize Claimed"}
+                          {isClaimPrizeLoading || isClaimPrizePending ? (
+                            <div className="flex items-center justify-center space-x-2">
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                              <span>
+                                {isClaimPrizePending ? "Claim Pending..." : "Processing Claim..."}
+                              </span>
+                            </div>
+                          ) : isClaimed ? (
+                            "🏆 Prize Claimed"
+                          ) : isWinner ? (
+                            "Claim Prize"
+                          ) : (
+                            "Not Winner"
+                          )}
                         </button>
                       )}
 
@@ -494,11 +597,22 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                                       : "💰 Refund Available to Sponsor"
                             } {isSponsor ? "(You)" : ""}</li>
                           )}
+                          {!hasNoPlayers && game.lastBuyer && game.lastBuyer !== "0x0000000000000000000000000000000000000000" && (
+                            <li>• Claim Prize Status: {
+                              isClaimed 
+                                ? "🏆 Prize Claimed" 
+                                : isClaimPrizePending 
+                                  ? "⏳ Claim Pending Confirmation" 
+                                  : isClaimPrizeLoading 
+                                    ? "🔄 Processing Claim" 
+                                    : "💰 Prize Available to Winner"
+                            } {isWinner ? "(You)" : ""}</li>
+                          )}
                           <li>• Final Phase Buy Count: {game.finalPhaseBuyCount}</li>
                           <li>• Game Status: {
-                            game.claimed 
+                            isClaimed 
                               ? "🏆 Prize Claimed" 
-                              : game.refunded 
+                              : isRefunded 
                                 ? "💸 Prize Refunded" 
                                 : isRefundSuccess 
                                   ? "💸 Prize Refunded" 
@@ -522,6 +636,21 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         </div>
                       )}
 
+                      {/* Claim Prize Success Message */}
+                      {isClaimPrizeSuccess && (
+                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                          <div className="text-center space-y-2">
+                            <div className="w-8 h-8 bg-green-400 rounded-full flex items-center justify-center mx-auto">
+                              <span className="text-green-900 text-xl">🏆</span>
+                            </div>
+                            <div className="text-green-300 font-medium">Prize Claimed Successfully!</div>
+                            <div className="text-sm text-green-200">
+                              Congratulations! Your prize has been sent to your wallet
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Refund Pending Message */}
                       {isRefundPending && (
                         <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
@@ -530,6 +659,22 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                             <div className="text-blue-300 font-medium">Refund Transaction Pending</div>
                             <div className="text-sm text-blue-200">
                               Your refund transaction is being processed on the blockchain
+                            </div>
+                            <div className="text-xs text-blue-100 mt-2">
+                              This may take a few minutes to confirm
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Claim Prize Pending Message */}
+                      {isClaimPrizePending && (
+                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                          <div className="text-center space-y-2">
+                            <div className="w-8 h-8 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mx-auto"></div>
+                            <div className="text-blue-300 font-medium">Claim Prize Transaction Pending</div>
+                            <div className="text-sm text-blue-200">
+                              Your claim prize transaction is being processed on the blockchain
                             </div>
                             <div className="text-xs text-blue-100 mt-2">
                               This may take a few minutes to confirm

@@ -81,6 +81,14 @@ export function useBullRunContract() {
     error: refundError
   } = useWriteContract()
 
+  // Claim prize contract write
+  const { 
+    data: claimPrizeHash, 
+    writeContract: claimPrizeWrite, 
+    isPending: isClaimPrizePending,
+    error: claimPrizeError
+  } = useWriteContract()
+
   // Wait for USDC approval transaction
   const { isLoading: isApproveLoading, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
     hash: approveHash,
@@ -94,6 +102,11 @@ export function useBullRunContract() {
   // Wait for refund transaction
   const { isLoading: isRefundLoading, isSuccess: isRefundSuccess } = useWaitForTransactionReceipt({
     hash: refundHash,
+  })
+
+  // Wait for claim prize transaction
+  const { isLoading: isClaimPrizeLoading, isSuccess: isClaimPrizeSuccess } = useWaitForTransactionReceipt({
+    hash: claimPrizeHash,
   })
 
   // Create a new BullRun game with USDC approval
@@ -211,6 +224,50 @@ export function useBullRunContract() {
     }
   }
 
+  // Claim prize when game ends and user is the winner
+  const claimPrize = async (gameId: number) => {
+    console.log('claimPrize called with gameId:', gameId)
+    console.log('User state:', { user: !!user, ready, address })
+    console.log('Claim prize write function:', !!claimPrizeWrite)
+    
+    if (!user || !ready || !address) {
+      console.log('Wallet not connected - throwing error')
+      throw new Error('Wallet not connected')
+    }
+
+    if (!claimPrizeWrite) {
+      console.log('Claim prize function not available - throwing error')
+      throw new Error('Claim prize function not available')
+    }
+
+    try {
+      console.log('Setting error to null and calling claimPrizeWrite')
+      setError(null)
+
+      // Call the claim prize function
+      claimPrizeWrite({
+        address: BULLRUN_CONTRACT_ADDRESS,
+        abi: BULLRUN_ABI,
+        functionName: 'claimPrize',
+        args: [BigInt(gameId)]
+      })
+
+      console.log('claimPrizeWrite called successfully')
+      
+      // Return success immediately after submitting the transaction
+      return {
+        success: true,
+        message: 'Claim prize transaction submitted successfully'
+      }
+
+    } catch (err) {
+      console.log('Error in claimPrize:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to claim prize'
+      setError(errorMessage)
+      throw new Error(errorMessage)
+    }
+  }
+
   // Get current game data
   const getGame = async (gameId: number) => {
     if (!user || !ready) {
@@ -229,11 +286,14 @@ export function useBullRunContract() {
 
   return {
     // State
-    isLoading: isApprovePending || isApproveLoading || isCreateGamePending || isCreateGameLoading || isRefundPending || isRefundLoading,
-    error: error || approveError?.message || createGameError?.message || refundError?.message || null,
+    isLoading: isApprovePending || isApproveLoading || isCreateGamePending || isCreateGameLoading || isRefundPending || isRefundLoading || isClaimPrizePending || isClaimPrizeLoading,
+    error: error || approveError?.message || createGameError?.message || refundError?.message || claimPrizeError?.message || null,
     isCreateGameSuccess,
     isRefundSuccess,
     isRefundPending,
+    isClaimPrizeSuccess,
+    isClaimPrizePending,
+    isClaimPrizeLoading,
     currentStep,
     
     // Data
@@ -244,6 +304,7 @@ export function useBullRunContract() {
     createGame,
     createGameAfterApproval,
     refundPrizePool,
+    claimPrize,
     getGame,
   }
 }

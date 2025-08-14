@@ -68,3 +68,33 @@ export const GAME_STATE_QUERY = `
     }
   }
 `
+
+// GraphQL query for prize claimed events
+export const PRIZE_CLAIMED_QUERY = `
+  query GetPrizeClaimed($gameId: String!) {
+    prizeClaimeds(where: { gameId: $gameId }, first: 1, orderBy: blockNumber, orderDirection: desc) {
+      id
+      gameId
+      winner
+      amount
+      blockNumber
+      blockTimestamp
+      transactionHash
+    }
+  }
+`
+
+// GraphQL query for refund issued events
+export const REFUND_ISSUED_QUERY = `
+  query GetRefundIssued($gameId: String!) {
+    refundIssueds(where: { gameId: $gameId }, first: 1, orderBy: blockNumber, orderDirection: desc) {
+      id
+      gameId
+      sponsor
+      amount
+      blockNumber
+      blockTimestamp
+      transactionHash
+    }
+  }
+`

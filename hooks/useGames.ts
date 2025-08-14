@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { graphqlClient, GAME_CREATEDS_QUERY } from '@/lib/graphql'
+import { graphqlClient, GAME_CREATEDS_QUERY, PRIZE_CLAIMED_QUERY, REFUND_ISSUED_QUERY } from '@/lib/graphql'
 import { zoraService } from '@/lib/zora-service'
 import { 
   formatTimeRemaining, 
@@ -41,10 +41,36 @@ export interface TransformedGame {
   marketCap?: number
   volume24h?: number
   uniqueHolders?: number
+  isClaimed?: boolean
+  isRefunded?: boolean
 }
 
 interface GraphQLResponse {
   gameCreateds: GameCreatedEvent[]
+}
+
+interface PrizeClaimedResponse {
+  prizeClaimeds: Array<{
+    id: string
+    gameId: string
+    winner: string
+    amount: string
+    blockNumber: string
+    blockTimestamp: string
+    transactionHash: string
+  }>
+}
+
+interface RefundIssuedResponse {
+  refundIssueds: Array<{
+    id: string
+    gameId: string
+    sponsor: string
+    amount: string
+    blockNumber: string
+    blockTimestamp: string
+    transactionHash: string
+  }>
 }
 
 export function useGames() {
@@ -70,6 +96,25 @@ export function useGames() {
             const endTime = startTime + (24 * 60 * 60) // 24 hour games
             const isActive = isGameActive(endTime)
             const timeLeftString = formatTimeRemaining(endTime)
+            
+            // Fetch real-time game status
+            let isClaimed = false
+            let isRefunded = false
+            
+            try {
+              // Check if prize was claimed
+              const prizeData = await graphqlClient.request<PrizeClaimedResponse>(PRIZE_CLAIMED_QUERY, { gameId: event.gameId })
+              isClaimed = prizeData.prizeClaimeds && prizeData.prizeClaimeds.length > 0
+              
+              // Check if refund was issued
+              const refundData = await graphqlClient.request<RefundIssuedResponse>(REFUND_ISSUED_QUERY, { gameId: event.gameId })
+              isRefunded = refundData.refundIssueds && refundData.refundIssueds.length > 0
+              
+              console.log(`Game ${event.gameId} status: claimed=${isClaimed}, refunded=${isRefunded}`)
+            } catch (statusError) {
+              console.warn(`Failed to fetch status for game ${event.gameId}:`, statusError)
+              // Keep default values
+            }
             
             // Try to fetch real post data from Zora
             let postTitle = generateMockPostTitle(event.gameId)
@@ -112,8 +157,8 @@ export function useGames() {
               postThumbnail,
               prizePool: formatUSDC(event.prizePool),
               timeLeft: timeLeftString,
-                          lastBuyer: isActive ? "0x1234567890abcdef1234567890abcdef12345678" : undefined,
-            winner: !isActive ? "0xabcdef1234567890abcdef1234567890abcdef12" : undefined,
+              lastBuyer: isActive ? "0x1234567890abcdef1234567890abcdef12345678" : undefined,
+              winner: !isActive ? "0xabcdef1234567890abcdef1234567890abcdef12" : undefined,
               status: isActive ? "active" : "ended",
               minBuy: calculateMinBuy(event.gameId, isActive),
               sponsor: event.sponsor,
@@ -122,6 +167,8 @@ export function useGames() {
               endTime: endTime,
               totalBuyCount: Math.floor(Math.random() * 50) + 5, // Random player count
               hasPlayer: Math.random() > 0.3, // 70% chance of having players
+              isClaimed,
+              isRefunded,
               creatorProfile: creatorProfile,
               marketCap: marketCap,
               volume24h: volume24h,
@@ -153,7 +200,9 @@ export function useGames() {
             startTime: Math.floor(Date.now() / 1000) - 3600,
             endTime: Math.floor(Date.now() / 1000) + 86400,
             totalBuyCount: 25,
-            hasPlayer: true
+            hasPlayer: true,
+            isClaimed: false,
+            isRefunded: false
           },
           {
             id: "2",
@@ -169,7 +218,9 @@ export function useGames() {
             startTime: Math.floor(Date.now() / 1000) - 82800,
             endTime: Math.floor(Date.now() / 1000) + 3600,
             totalBuyCount: 15,
-            hasPlayer: true
+            hasPlayer: true,
+            isClaimed: false,
+            isRefunded: false
           }
         ]
         setGames(fallbackGames)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { graphqlClient, GAME_DETAILS_QUERY, GAME_STATE_QUERY } from '@/lib/graphql'
+import { graphqlClient, GAME_DETAILS_QUERY, GAME_STATE_QUERY, PRIZE_CLAIMED_QUERY, REFUND_ISSUED_QUERY } from '@/lib/graphql'
 import { zoraService } from '@/lib/zora-service'
 import { 
   formatTimeRemaining, 
@@ -45,6 +45,11 @@ export interface TransformedGameDetail {
   marketCap?: number
   volume24h?: number
   uniqueHolders?: number
+  // Real-time blockchain status
+  blockchainClaimed: boolean
+  blockchainRefunded: boolean
+  prizeClaimedEvent?: any
+  refundIssuedEvent?: any
   buyEvents: Array<{
     id: string
     gameId: string
@@ -74,6 +79,30 @@ interface GameStateResponse {
   }>
 }
 
+interface PrizeClaimedResponse {
+  prizeClaimeds: Array<{
+    id: string
+    gameId: string
+    winner: string
+    amount: string
+    blockNumber: string
+    blockTimestamp: string
+    transactionHash: string
+  }>
+}
+
+interface RefundIssuedResponse {
+  refundIssueds: Array<{
+    id: string
+    gameId: string
+    sponsor: string
+    amount: string
+    blockNumber: string
+    blockTimestamp: string
+    transactionHash: string
+  }>
+}
+
 export function useGame(gameId: string) {
   const [game, setGame] = useState<TransformedGameDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -96,6 +125,8 @@ export function useGame(gameId: string) {
         // Try to fetch the game creation data
         let gameData: GameCreatedEvent | null = null
         let buyEvents: GameStateResponse['buyPostCoins'] = []
+        let prizeClaimedEvent: any = null
+        let refundIssuedEvent: any = null
         
         try {
           // Fetch game creation event
@@ -118,15 +149,45 @@ export function useGame(gameId: string) {
             console.log('✅ Buy events query successful')
             console.log('Raw buy events response:', stateData)
             
-            if (stateData.buyPostCoins && stateData.buyPostCoins.length > 0) {
+            if (stateData.buyPostCoins) {
               buyEvents = stateData.buyPostCoins
-              console.log('Buy events data found:', buyEvents.length, 'events')
-            } else {
-              console.log('No buy events found in response')
+              console.log('Buy events found:', buyEvents.length)
             }
           } catch (stateError) {
-            console.warn('❌ Failed to fetch buy events data, using fallback:', stateError)
-            // Continue with fallback data
+            console.log('❌ Buy events query failed:', stateError)
+            buyEvents = []
+          }
+
+          // Fetch prize claimed events to get real claimed status
+          try {
+            console.log('🔍 Executing prize claimed query...')
+            const prizeData = await graphqlClient.request<PrizeClaimedResponse>(PRIZE_CLAIMED_QUERY, { gameId })
+            console.log('✅ Prize claimed query successful')
+            console.log('Raw prize claimed response:', prizeData)
+            
+            if (prizeData.prizeClaimeds && prizeData.prizeClaimeds.length > 0) {
+              prizeClaimedEvent = prizeData.prizeClaimeds[0]
+              console.log('Prize claimed event found:', prizeClaimedEvent)
+            }
+          } catch (prizeError) {
+            console.log('❌ Prize claimed query failed:', prizeError)
+            prizeClaimedEvent = null
+          }
+
+          // Fetch refund issued events to get real refund status
+          try {
+            console.log('🔍 Executing refund issued query...')
+            const refundData = await graphqlClient.request<RefundIssuedResponse>(REFUND_ISSUED_QUERY, { gameId })
+            console.log('✅ Refund issued query successful')
+            console.log('Raw refund issued response:', refundData)
+            
+            if (refundData.refundIssueds && refundData.refundIssueds.length > 0) {
+              refundIssuedEvent = refundData.refundIssueds[0]
+              console.log('Refund issued event found:', refundIssuedEvent)
+            }
+          } catch (refundError) {
+            console.log('❌ Refund issued query failed:', refundError)
+            refundIssuedEvent = null
           }
           
         } catch (graphqlError) {
@@ -203,8 +264,8 @@ export function useGame(gameId: string) {
         const realFinalPhaseBuyCount = Math.floor(realTotalBuyCount * 0.3) // Estimate based on total count
         
         // For now, we'll use mock data for claimed/refunded since these aren't in the events
-        const realClaimed = false // TODO: Query PrizeClaimed events if available
-        const realRefunded = false // TODO: Query RefundIssued events if available
+        const realClaimed = prizeClaimedEvent !== null
+        const realRefunded = refundIssuedEvent !== null
         const realHasPlayer = realTotalBuyCount > 0
         
         console.log('=== REAL DATA ANALYSIS ===')
@@ -256,6 +317,10 @@ export function useGame(gameId: string) {
           marketCap,
           volume24h,
           uniqueHolders,
+          blockchainClaimed: realClaimed,
+          blockchainRefunded: realRefunded,
+          prizeClaimedEvent: prizeClaimedEvent,
+          refundIssuedEvent: refundIssuedEvent,
           buyEvents: buyEvents // Include buy events in the transformed object
         }
         
@@ -306,7 +371,11 @@ export function useGame(gameId: string) {
           hasPlayer: true,
           description: "An amazing NFT collection that's taking the world by storm!",
           symbol: "EPIC",
-          buyEvents: [] // No buy events in fallback
+          buyEvents: [], // No buy events in fallback
+          blockchainClaimed: false,
+          blockchainRefunded: false,
+          prizeClaimedEvent: null,
+          refundIssuedEvent: null
         }
         setGame(fallbackGame)
       } finally {
