@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { AlertCircle, Rocket, DollarSign, Link, Search, ExternalLink, TrendingUp, Users } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useZoraCoin } from "@/hooks/use-zora-coin"
+import { useBullRunContract } from "@/hooks/use-bullrun-contract"
+import { toast } from "sonner"
 
 interface CreateBullRunFormProps {
   onGameCreated: (gameData: {
@@ -23,12 +25,18 @@ interface CreateBullRunFormProps {
 export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
   const [formData, setFormData] = useState({
     coinAddress: "",
-    prizePool: "100",
+    prizePool: "3",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isLoading, setIsLoading] = useState(false)
   
   const { coinData, isLoading: isCoinLoading, error: coinError, fetchCoinData, clearData } = useZoraCoin()
+  const { 
+    createGame, 
+    isLoading, 
+    error: contractError, 
+    isCreateGameSuccess,
+    minBudget 
+  } = useBullRunContract()
 
   // Fetch coin data when address changes
   useEffect(() => {
@@ -42,6 +50,29 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
 
     return () => clearTimeout(timeoutId)
   }, [formData.coinAddress, fetchCoinData, clearData])
+
+  // Handle successful game creation
+  useEffect(() => {
+    if (isCreateGameSuccess) {
+      toast.success("🎮 Game created successfully!")
+      // You might want to get the actual game ID from the contract here
+      const gameId = Math.random().toString(36).substring(7) // Temporary fallback
+      const gameData = {
+        id: gameId,
+        gameLink: `${window.location.origin}/game/${gameId}`,
+        prizePool: Number.parseFloat(formData.prizePool),
+        duration: 24,
+      }
+      onGameCreated(gameData)
+    }
+  }, [isCreateGameSuccess, formData.prizePool, onGameCreated])
+
+  // Handle contract errors
+  useEffect(() => {
+    if (contractError) {
+      toast.error(`Contract Error: ${contractError}`)
+    }
+  }, [contractError])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -59,8 +90,13 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
     const prizePool = Number.parseFloat(formData.prizePool)
     if (!formData.prizePool || Number.isNaN(prizePool)) {
       newErrors.prizePool = "Prize pool is required"
-    } else if (prizePool < 100) {
+    } else if (prizePool < 3) {
       newErrors.prizePool = "Minimum prize pool is 100 USDC"
+    }
+
+    // Check against contract minimum if available
+    if (minBudget && prizePool < Number(minBudget)) {
+      newErrors.prizePool = `Minimum prize pool is ${minBudget} USDC (contract requirement)`
     }
 
     setErrors(newErrors)
@@ -72,25 +108,17 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
 
     if (!validateForm()) return
 
-    setIsLoading(true)
-
     try {
-      // Simulate smart contract interaction
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      const gameId = Math.random().toString(36).substring(7)
-      const gameData = {
-        id: gameId,
-        gameLink: `${window.location.origin}/game/${gameId}`,
-        prizePool: Number.parseFloat(formData.prizePool),
-        duration: 24,
+      // Call the smart contract to create the game
+      const result = await createGame(formData.coinAddress, formData.prizePool)
+      
+      if (result?.success) {
+        toast.success("Transaction submitted! Waiting for confirmation...")
+        // The useEffect above will handle the success case when transaction is confirmed
       }
-
-      onGameCreated(gameData)
     } catch (error) {
       console.error("Failed to create game:", error)
-    } finally {
-      setIsLoading(false)
+      toast.error(`Failed to create game: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -213,7 +241,7 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
             <Input
               id="prizePool"
               type="number"
-              min="100"
+              min="3"
               step="1"
               placeholder="100"
               value={formData.prizePool}
@@ -225,11 +253,16 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
 
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
             <div className="text-sm text-yellow-300">
-              <strong>Minimum:</strong> 100 USDC
+              <strong>Minimum:</strong> {minBudget ? `${minBudget} USDC (contract)` : '100 USDC'}
             </div>
             <div className="text-xs text-gray-400 mt-1">
               Higher prize pools attract more players and create more viral potential
             </div>
+            {minBudget && (
+              <div className="text-xs text-blue-300 mt-1">
+                Contract requirement: {minBudget} USDC minimum
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -280,6 +313,38 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
           </Alert>
         </CardContent>
       </Card>
+
+      {/* Transaction Status */}
+      {isLoading && (
+        <Card className="bg-blue-500/10 border-blue-500/30">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-3">
+              <div className="w-8 h-8 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mx-auto"></div>
+              <div className="text-blue-300 font-medium">Creating Game...</div>
+              <div className="text-sm text-blue-200">
+                Transaction submitted to blockchain. Please wait for confirmation.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Success Message */}
+      {isCreateGameSuccess && (
+        <Card className="bg-green-500/10 border-green-500/30">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-3">
+              <div className="w-8 h-8 bg-green-400 rounded-full flex items-center justify-center mx-auto">
+                <span className="text-green-900 text-xl">✓</span>
+              </div>
+              <div className="text-green-300 font-medium">Game Created Successfully!</div>
+              <div className="text-sm text-green-200">
+                Your BullRun game is now live on the blockchain!
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Launch Button */}
       <Card className="bg-gradient-to-r from-green-500/10 to-yellow-500/10 border-green-500/30">
