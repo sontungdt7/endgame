@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { WagmiConfig } from 'wagmi'
+import { WagmiProvider } from '@privy-io/wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { config } from '@/lib/wagmi'
 
@@ -9,7 +9,7 @@ interface WagmiProviderProps {
   children: React.ReactNode
 }
 
-export function WagmiProvider({ children }: WagmiProviderProps) {
+export function WagmiProviderWrapper({ children }: WagmiProviderProps) {
   const [queryClient] = useState(() => new QueryClient())
   const [mounted, setMounted] = useState(false)
 
@@ -23,9 +23,9 @@ export function WagmiProvider({ children }: WagmiProviderProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WagmiConfig config={config}>
+      <WagmiProvider config={config}>
         {children}
-      </WagmiConfig>
+      </WagmiProvider>
     </QueryClientProvider>
   )
 }

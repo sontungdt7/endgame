@@ -1,6 +1,7 @@
 'use client';
 
 import { PrivyProvider } from '@privy-io/react-auth';
+import { base } from 'wagmi/chains';
 
 interface PrivyProviderWrapperProps {
   children: React.ReactNode;
@@ -28,7 +29,8 @@ export function PrivyProviderWrapper({ children }: PrivyProviderWrapperProps) {
         appearance: {
           theme: 'dark',
           accentColor: '#22c55e'
-        }
+        },
+        supportedChains: [base]
       }}
     >
       {children}

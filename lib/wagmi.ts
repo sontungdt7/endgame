@@ -1,13 +1,9 @@
-import { createConfig, http } from 'wagmi'
+import { createConfig } from '@privy-io/wagmi'
+import { http } from 'wagmi'
 import { base } from 'wagmi/chains'
-import { injected, walletConnect } from '@wagmi/connectors'
 
 export const config = createConfig({
   chains: [base],
-  connectors: [
-    injected(),
-    walletConnect({ projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || '' }),
-  ],
   transports: {
     [base.id]: http(),
   },
