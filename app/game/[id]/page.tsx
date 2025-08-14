@@ -118,10 +118,9 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                     </>
                   )}
                 </div>
-                <p className="text-gray-400 text-sm">{game.postTitle}</p>
-                {game.symbol && (
-                  <p className="text-gray-500 text-xs">Symbol: {game.symbol}</p>
-                )}
+                                
+                <p className="text-gray-500 text-xs">{game.symbol}: <span className="font-mono">{formatAddress(game.postCoin)}</span></p>
+                <p className="text-gray-500 text-xs">Created by: <span className="font-mono">{formatAddress(game.sponsor)}</span></p>
               </div>
             </div>
             <div className="text-right">
@@ -170,7 +169,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                   alt="Post preview"
                   className="w-full h-64 object-cover rounded-lg mb-4"
                 />
-                <h2 className="text-xl font-bold mb-2">{game.postTitle}</h2>
+                <h2 className="text-xl font-bold mb-2">{game.postTitle}</h2>            
                 <p className="text-gray-300 mb-4">
                   {game.description ? (
                     game.description
@@ -180,6 +179,35 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                     </span>
                   )}
                 </p>
+                {game.marketCap !== undefined || game.volume24h !== undefined || game.uniqueHolders !== undefined ? (
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {game.marketCap !== undefined && (
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Market Cap</div>
+                      <div className="text-lg font-bold text-green-400">
+                        ${game.marketCap.toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                  {game.volume24h !== undefined && (
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">24h Volume</div>
+                      <div className="text-lg font-bold text-blue-400">
+                        ${game.volume24h.toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                  {game.uniqueHolders !== undefined && (
+                    <div>
+                      <div className="text-xs text-gray-400 mb-1">Unique Holders</div>
+                      <div className="text-lg font-bold text-purple-400">
+                        {game.uniqueHolders.toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                </div>                
+            ) : null}
                 
                 {/* Creator Profile Section */}
                 {game.creatorProfile && (
@@ -236,8 +264,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                             >
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                              </svg>
-                              <span>@{game.creatorProfile.socialAccounts.twitter.username}</span>
+                              </svg>                        
                             </a>
                           )}
                           
@@ -270,49 +297,12 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                           )}
                         </div>
                       </div>
-                    </div>
+                    </div>                    {/* Market Data Section */}                            
                   </div>
                 )}
+
+                                
                 
-                <div className="text-sm text-gray-400 mb-2">
-                  PostCoin: <span className="font-mono">{formatAddress(game.postCoin)}</span>
-                </div>
-                <div className="text-sm text-gray-400">
-                  Sponsored by: <span className="font-mono">{formatAddress(game.sponsor)}</span>
-                </div>
-                
-                {/* Market Data Section */}
-                {game.marketCap !== undefined || game.volume24h !== undefined || game.uniqueHolders !== undefined ? (
-                  <div className="bg-gray-700/30 rounded-lg p-4 mt-4 border border-gray-600">
-                    <h3 className="text-sm font-semibold text-gray-300 mb-3">Market Data</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {game.marketCap !== undefined && (
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1">Market Cap</div>
-                          <div className="text-lg font-bold text-green-400">
-                            ${game.marketCap.toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-                      {game.volume24h !== undefined && (
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1">24h Volume</div>
-                          <div className="text-lg font-bold text-blue-400">
-                            ${game.volume24h.toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-                      {game.uniqueHolders !== undefined && (
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1">Unique Holders</div>
-                          <div className="text-lg font-bold text-purple-400">
-                            {game.uniqueHolders.toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
                 
               </div>
 
