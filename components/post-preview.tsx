@@ -38,8 +38,123 @@ export function PostPreview({ game }: PostPreviewProps) {
         />
 
         <p className="text-gray-300 leading-relaxed">
-          {game.description || "Discover the most innovative NFT collection that's revolutionizing digital art. Join thousands of collectors in this groundbreaking project."}
+          {game.description ? (
+            game.description
+          ) : (
+            <span className="text-gray-400 italic">
+              Description not available. Please check your Zora API key configuration to display real coin descriptions.
+            </span>
+          )}
         </p>
+
+        {/* Creator Profile Section */}
+        {game.creatorProfile && (
+          <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600">
+            <div className="flex items-center space-x-2 mb-2">
+              {game.creatorProfile.avatar?.medium && (
+                <img 
+                  src={game.creatorProfile.avatar.medium} 
+                  alt="Creator avatar"
+                  className="w-8 h-8 rounded-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
+                  }}
+                />
+              )}
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <span className="font-medium text-white text-sm">
+                    {game.creatorProfile.displayName || game.creatorProfile.handle || 'Creator'}
+                  </span>
+                  {game.creatorProfile.handle && (
+                    <span className="text-gray-400 text-xs">@{game.creatorProfile.handle}</span>
+                  )}
+                </div>
+                
+                {/* Creator Links - Compact Version */}
+                <div className="flex items-center space-x-2 mt-1">
+                  {game.creatorProfile.website && (
+                    <a 
+                      href={game.creatorProfile.website} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                    >
+                      🌐 {game.creatorProfile.website.length > 20 ? game.creatorProfile.website.substring(0, 20) + '...' : game.creatorProfile.website}
+                    </a>
+                  )}
+                  
+                  {game.creatorProfile.socialAccounts?.twitter?.username && (
+                    <a 
+                      href={`https://x.com/${game.creatorProfile.socialAccounts.twitter.username}`}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                    >
+                      𝕏 @{game.creatorProfile.socialAccounts.twitter.username}
+                    </a>
+                  )}
+                  
+                  {game.creatorProfile.socialAccounts?.instagram?.displayName && (
+                    <a 
+                      href={`https://instagram.com/${game.creatorProfile.socialAccounts.instagram.displayName}`}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-pink-400 hover:text-pink-300 text-xs transition-colors"
+                    >
+                      📷 Instagram
+                    </a>
+                  )}
+                  
+                  {game.creatorProfile.socialAccounts?.tiktok?.displayName && (
+                    <a 
+                      href={`https://tiktok.com/@${game.creatorProfile.socialAccounts.tiktok.displayName}`}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-gray-400 hover:text-gray-300 text-xs transition-colors"
+                    >
+                      🎵 TikTok
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Market Data Section */}
+        {game.marketCap !== undefined || game.volume24h !== undefined || game.uniqueHolders !== undefined ? (
+          <div className="bg-gray-700/30 rounded-lg p-3 border border-gray-600">
+            <h3 className="text-xs font-semibold text-gray-300 mb-2">Market Data</h3>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              {game.marketCap !== undefined && (
+                <div>
+                  <div className="text-gray-400 mb-1">Market Cap</div>
+                  <div className="font-bold text-green-400">
+                    ${game.marketCap.toLocaleString()}
+                  </div>
+                </div>
+              )}
+              {game.volume24h !== undefined && (
+                <div>
+                  <div className="text-gray-400 mb-1">24h Vol</div>
+                  <div className="font-bold text-blue-400">
+                    ${game.volume24h.toLocaleString()}
+                  </div>
+                </div>
+              )}
+              {game.uniqueHolders !== undefined && (
+                <div>
+                  <div className="text-gray-400 mb-1">Holders</div>
+                  <div className="font-bold text-purple-400">
+                    {game.uniqueHolders.toLocaleString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         <div className="bg-gray-700/50 rounded-lg p-4">
           <div className="flex items-center justify-between">

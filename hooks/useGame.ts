@@ -41,6 +41,10 @@ export interface TransformedGameDetail {
   hasPlayer: boolean
   description?: string
   symbol?: string
+  creatorProfile?: any
+  marketCap?: number
+  volume24h?: number
+  uniqueHolders?: number
   buyEvents: Array<{
     id: string
     gameId: string
@@ -149,6 +153,10 @@ export function useGame(gameId: string) {
         let postThumbnail = `/placeholder.svg?height=200&width=300`
         let description: string | undefined
         let symbol: string | undefined
+        let creatorProfile: any = undefined
+        let marketCap: number | undefined = undefined
+        let volume24h: number | undefined = undefined
+        let uniqueHolders: number | undefined = undefined
         
         try {
           console.log(`Fetching Zora data for postCoin: ${gameData.postCoin}`)
@@ -158,12 +166,29 @@ export function useGame(gameId: string) {
               name: zoraData.name,
               hasImage: !!zoraData.imageUrl,
               hasDescription: !!zoraData.description,
-              symbol: zoraData.symbol
+              symbol: zoraData.symbol,
+              hasCreatorProfile: !!zoraData.creatorProfile,
+              marketCap: zoraData.marketCap,
+              volume24h: zoraData.volume24h,
+              uniqueHolders: zoraData.uniqueHolders
+            })
+            console.log(`Detailed Zora data analysis:`, {
+              description: zoraData.description,
+              descriptionType: typeof zoraData.description,
+              descriptionLength: zoraData.description?.length,
+              isDescriptionEmpty: zoraData.description === '',
+              isDescriptionNull: zoraData.description === null,
+              isDescriptionUndefined: zoraData.description === undefined,
+              rawDescription: JSON.stringify(zoraData.description)
             })
             postTitle = zoraData.name || postTitle
             postThumbnail = zoraData.imageUrl || postThumbnail
             description = zoraData.description
             symbol = zoraData.symbol
+            creatorProfile = zoraData.creatorProfile
+            marketCap = zoraData.marketCap
+            volume24h = zoraData.volume24h
+            uniqueHolders = zoraData.uniqueHolders
           } else {
             console.log(`No Zora data found for ${gameData.postCoin}`)
           }
@@ -227,6 +252,10 @@ export function useGame(gameId: string) {
           hasPlayer,
           description,
           symbol,
+          creatorProfile,
+          marketCap,
+          volume24h,
+          uniqueHolders,
           buyEvents: buyEvents // Include buy events in the transformed object
         }
         

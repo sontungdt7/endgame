@@ -37,6 +37,10 @@ export interface TransformedGame {
   totalBuyCount: number
   hasPlayer: boolean
   description?: string
+  creatorProfile?: any
+  marketCap?: number
+  volume24h?: number
+  uniqueHolders?: number
 }
 
 interface GraphQLResponse {
@@ -70,6 +74,10 @@ export function useGames() {
             // Try to fetch real post data from Zora
             let postTitle = generateMockPostTitle(event.gameId)
             let postThumbnail = `/placeholder.svg?height=200&width=300`
+            let creatorProfile: any = undefined
+            let marketCap: number | undefined = undefined
+            let volume24h: number | undefined = undefined
+            let uniqueHolders: number | undefined = undefined
             
             console.log(`[${index + 1}/${gameEvents.length}] Fetching Zora data for postCoin: ${event.postCoin}`)
             
@@ -78,10 +86,18 @@ export function useGames() {
               if (zoraData) {
                 console.log(`Zora data received for ${event.postCoin}:`, {
                   name: zoraData.name,
-                  hasImage: !!zoraData.imageUrl
+                  hasImage: !!zoraData.imageUrl,
+                  hasCreatorProfile: !!zoraData.creatorProfile,
+                  marketCap: zoraData.marketCap,
+                  volume24h: zoraData.volume24h,
+                  uniqueHolders: zoraData.uniqueHolders
                 })
                 postTitle = zoraData.name || postTitle
                 postThumbnail = zoraData.imageUrl || postThumbnail
+                creatorProfile = zoraData.creatorProfile
+                marketCap = zoraData.marketCap
+                volume24h = zoraData.volume24h
+                uniqueHolders = zoraData.uniqueHolders
               } else {
                 console.log(`No Zora data found for ${event.postCoin}`)
               }
@@ -105,7 +121,11 @@ export function useGames() {
               startTime: startTime,
               endTime: endTime,
               totalBuyCount: Math.floor(Math.random() * 50) + 5, // Random player count
-              hasPlayer: Math.random() > 0.3 // 70% chance of having players
+              hasPlayer: Math.random() > 0.3, // 70% chance of having players
+              creatorProfile: creatorProfile,
+              marketCap: marketCap,
+              volume24h: volume24h,
+              uniqueHolders: uniqueHolders
             }
           })
         )
