@@ -4,6 +4,7 @@ import { useState, use } from "react"
 import { GameHeader } from "@/components/game-header"
 import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
 import { useGame } from "@/hooks/useGame"
+import { useBullRunContract } from "@/hooks/use-bullrun-contract"
 import { formatAddress, formatTimeAgo, formatBuyAmount } from "@/lib/utils"
 import { USDCBalance, useMaxBuyAmount } from "@/components/usdc-balance"
 import { PostCoinBalance } from "@/components/postcoin-balance"
@@ -11,6 +12,8 @@ import { usePostCoinBalance } from "@/hooks/use-postcoin-balance"
 import { use0xSwapPrice } from "@/hooks/use-0x-swap"
 import { SwapPriceDisplay } from "@/components/swap-price-display"
 import { parseUnits, formatUnits } from "viem"
+import { toast } from "sonner"
+import { useAccount } from "wagmi"
 
 export default function GameDetailPage({ params }: { params: Promise<{ id:string }> }) {
   const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy")
@@ -20,10 +23,34 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
   const { game, loading, error } = useGame(id)
   const maxBuyAmount = useMaxBuyAmount()
   
+  // BullRun contract hook for refund functionality
+  const { refundPrizePool, isLoading: isRefundLoading, isRefundSuccess, isRefundPending, error: refundError } = useBullRunContract()
+  
   // Get PostCoin balance for percentage calculations
   const { balance: postCoinBalance } = usePostCoinBalance({ 
     postCoinAddress: game?.postCoin || "", 
     chainId: 8453 
+  })
+
+  // Check if current user is the sponsor (for refund functionality)
+  const { address: currentUserAddress } = useAccount()
+  const isSponsor = currentUserAddress && game?.sponsor && 
+    currentUserAddress.toLowerCase() === game.sponsor.toLowerCase()
+
+  // Calculate game state variables
+  const isEnded = game?.status === "ended"
+  const hasNoPlayers = isEnded && game?.totalBuyCount === 0
+
+  // Debug logging
+  console.log('Refund Debug Info:', {
+    currentUserAddress,
+    gameSponsor: game?.sponsor,
+    isSponsor,
+    hasNoPlayers,
+    gameRefunded: game?.refunded,
+    gameStatus: game?.status,
+    totalBuyCount: game?.totalBuyCount,
+    userConnected: !!currentUserAddress
   })
 
   // 0x Swap Price hooks
@@ -50,6 +77,61 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
       setSellAmount(amount.toFixed(6)) // 6 decimal places for tokens
       console.log(`Setting sell amount to ${amount.toFixed(6)} ${game.symbol || 'POST'} (${percentage}% of ${parseFloat(postCoinBalance).toFixed(1)})`)
     }
+  }
+
+  // Handle refund prize pool
+  const handleRefundPrizePool = async () => {
+    console.log('Refund button clicked!')
+    console.log('Game data:', game)
+    console.log('Current user address:', currentUserAddress)
+    
+    if (!game) {
+      console.log('No game data available')
+      toast.error('No game data available')
+      return
+    }
+
+    if (!currentUserAddress) {
+      console.log('No user address available')
+      toast.error('Please connect your wallet first')
+      return
+    }
+
+    if (!isSponsor) {
+      console.log('User is not the sponsor')
+      toast.error('Only the game sponsor can refund the prize pool')
+      return
+    }
+
+    if (game.refunded || isRefundSuccess) {
+      console.log('Game already refunded')
+      toast.error('This game has already been refunded')
+      return
+    }
+
+    try {
+      console.log('Calling refundPrizePool with game ID:', game.gameId)
+      const result = await refundPrizePool(parseInt(game.gameId))
+      
+      console.log('Refund result:', result)
+      
+      if (result?.success) {
+        toast.success("Refund transaction submitted! Waiting for confirmation...")
+      }
+    } catch (error) {
+      console.error("Failed to refund prize pool:", error)
+      toast.error(`Failed to refund: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  // Handle refund success
+  if (isRefundSuccess) {
+    toast.success("🎉 Prize pool refunded successfully!")
+  }
+
+  // Handle refund errors
+  if (refundError) {
+    toast.error(`Refund Error: ${refundError}`)
   }
   
   // Show loading state
@@ -88,9 +170,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
     )
   }
 
-  const isEnded = game.status === "ended"
   const isWinner = isEnded && game.lastBuyer === "0x1234567890abcdef1234567890abcdef12345678" // Mock current user for now
-  const hasNoPlayers = isEnded && game.totalBuyCount === 0
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -326,9 +406,59 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                       </div>
 
                       {hasNoPlayers ? (
-                        <button className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-lg transition-colors">
-                          Refund Prize Pool
-                        </button>
+                        game.refunded || isRefundSuccess ? (
+                          <div className="text-center p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                            <p className="text-green-400 text-sm font-medium">Prize Pool Refunded</p>
+                            <p className="text-green-300 text-xs mt-1">
+                              {isRefundSuccess 
+                                ? "Your refund transaction has been confirmed! The prize pool has been returned to your wallet."
+                                : "This game's prize pool has already been refunded to the sponsor"
+                              }
+                            </p>
+                          </div>
+                        ) : !currentUserAddress ? (
+                          <div className="text-center p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                            <p className="text-blue-400 text-sm font-medium">Connect Wallet Required</p>
+                            <p className="text-blue-300 text-xs mt-1">
+                              Please connect your wallet to refund the prize pool
+                            </p>
+                          </div>
+                        ) : isSponsor ? (
+                          <button 
+                            onClick={handleRefundPrizePool}
+                            disabled={isRefundLoading || isRefundPending || game.refunded || isRefundSuccess}
+                            className={`w-full font-bold py-3 rounded-lg transition-colors ${
+                              isRefundLoading || isRefundPending || game.refunded || isRefundSuccess
+                                ? "bg-gray-600 text-gray-400 cursor-not-allowed" 
+                                : "bg-yellow-600 hover:bg-yellow-700 text-white"
+                            }`}
+                          >
+                            {isRefundLoading || isRefundPending ? (
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                <span>
+                                  {isRefundPending ? "Refund Pending..." : "Processing Refund..."}
+                                </span>
+                              </div>
+                            ) : game.refunded || isRefundSuccess ? (
+                              "Already Refunded"
+                            ) : (
+                              "Refund Prize Pool"
+                            )}
+                          </button>
+                        ) : (
+                          <div className="text-center p-4 bg-gray-700 rounded-lg">
+                            <p className="text-gray-400 text-sm">
+                              Only the game sponsor can refund the prize pool
+                            </p>
+                            <p className="text-gray-500 text-xs mt-1">
+                              Sponsor: {formatAddress(game.sponsor)}
+                            </p>
+                            <p className="text-gray-500 text-xs mt-1">
+                              Your address: {formatAddress(currentUserAddress)}
+                            </p>
+                          </div>
+                        )
                       ) : (
                         <button
                           className={`w-full font-bold py-3 rounded-lg transition-colors ${
@@ -347,14 +477,66 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
                         <ul className="text-sm text-gray-300 space-y-1">
                           <li>• Prize Pool: ${game.prizePool.toFixed(2)} USDC</li>
                           <li>• Total Players: {game.totalBuyCount}</li>
+                          <li>• Sponsor: {formatAddress(game.sponsor)}</li>
                           {game.lastBuyer && game.lastBuyer !== "0x0000000000000000000000000000000000000000" && (
                             <li>• Winner: {formatAddress(game.lastBuyer)}</li>
                           )}
-                          {hasNoPlayers && <li>• Refund available to sponsor</li>}
+                          {hasNoPlayers && (
+                            <li>• Refund Status: {
+                              game.refunded 
+                                ? "✅ Prize Pool Refunded" 
+                                : isRefundSuccess 
+                                  ? "✅ Refund Confirmed" 
+                                  : isRefundPending 
+                                    ? "⏳ Refund Pending Confirmation" 
+                                    : isRefundLoading 
+                                      ? "🔄 Processing Refund" 
+                                      : "💰 Refund Available to Sponsor"
+                            } {isSponsor ? "(You)" : ""}</li>
+                          )}
                           <li>• Final Phase Buy Count: {game.finalPhaseBuyCount}</li>
-                          <li>• Game Status: {game.claimed ? "Prize Claimed" : "Prize Available"}</li>
+                          <li>• Game Status: {
+                            game.claimed 
+                              ? "🏆 Prize Claimed" 
+                              : game.refunded 
+                                ? "💸 Prize Refunded" 
+                                : isRefundSuccess 
+                                  ? "💸 Prize Refunded" 
+                                  : "💰 Prize Available"
+                          }</li>
                         </ul>
                       </div>
+
+                      {/* Refund Success Message */}
+                      {isRefundSuccess && (
+                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                          <div className="text-center space-y-2">
+                            <div className="w-8 h-8 bg-green-400 rounded-full flex items-center justify-center mx-auto">
+                              <span className="text-green-900 text-xl">✓</span>
+                            </div>
+                            <div className="text-green-300 font-medium">Refund Successful!</div>
+                            <div className="text-sm text-green-200">
+                              Your prize pool has been refunded to your wallet
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Refund Pending Message */}
+                      {isRefundPending && (
+                        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                          <div className="text-center space-y-2">
+                            <div className="w-8 h-8 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mx-auto"></div>
+                            <div className="text-blue-300 font-medium">Refund Transaction Pending</div>
+                            <div className="text-sm text-blue-200">
+                              Your refund transaction is being processed on the blockchain
+                            </div>
+                            <div className="text-xs text-blue-100 mt-2">
+                              This may take a few minutes to confirm
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     // Active Game Trading Interface

@@ -73,6 +73,14 @@ export function useBullRunContract() {
     error: createGameError
   } = useWriteContract()
 
+  // Refund contract write
+  const { 
+    data: refundHash, 
+    writeContract: refundWrite, 
+    isPending: isRefundPending,
+    error: refundError
+  } = useWriteContract()
+
   // Wait for USDC approval transaction
   const { isLoading: isApproveLoading, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
     hash: approveHash,
@@ -81,6 +89,11 @@ export function useBullRunContract() {
   // Wait for create game transaction
   const { isLoading: isCreateGameLoading, isSuccess: isCreateGameSuccess } = useWaitForTransactionReceipt({
     hash: createGameHash,
+  })
+
+  // Wait for refund transaction
+  const { isLoading: isRefundLoading, isSuccess: isRefundSuccess } = useWaitForTransactionReceipt({
+    hash: refundHash,
   })
 
   // Create a new BullRun game with USDC approval
@@ -154,6 +167,50 @@ export function useBullRunContract() {
     }
   }
 
+  // Refund prize pool when no players join
+  const refundPrizePool = async (gameId: number) => {
+    console.log('refundPrizePool called with gameId:', gameId)
+    console.log('User state:', { user: !!user, ready, address })
+    console.log('Refund write function:', !!refundWrite)
+    
+    if (!user || !ready || !address) {
+      console.log('Wallet not connected - throwing error')
+      throw new Error('Wallet not connected')
+    }
+
+    if (!refundWrite) {
+      console.log('Refund function not available - throwing error')
+      throw new Error('Refund function not available')
+    }
+
+    try {
+      console.log('Setting error to null and calling refundWrite')
+      setError(null)
+
+      // Call the refund function
+      refundWrite({
+        address: BULLRUN_CONTRACT_ADDRESS,
+        abi: BULLRUN_ABI,
+        functionName: 'refund',
+        args: [BigInt(gameId)]
+      })
+
+      console.log('refundWrite called successfully')
+      
+      // Return success immediately after submitting the transaction
+      return {
+        success: true,
+        message: 'Refund transaction submitted successfully'
+      }
+
+    } catch (err) {
+      console.log('Error in refundPrizePool:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to refund prize pool'
+      setError(errorMessage)
+      throw new Error(errorMessage)
+    }
+  }
+
   // Get current game data
   const getGame = async (gameId: number) => {
     if (!user || !ready) {
@@ -172,9 +229,11 @@ export function useBullRunContract() {
 
   return {
     // State
-    isLoading: isApprovePending || isApproveLoading || isCreateGamePending || isCreateGameLoading,
-    error: error || approveError?.message || createGameError?.message || null,
+    isLoading: isApprovePending || isApproveLoading || isCreateGamePending || isCreateGameLoading || isRefundPending || isRefundLoading,
+    error: error || approveError?.message || createGameError?.message || refundError?.message || null,
     isCreateGameSuccess,
+    isRefundSuccess,
+    isRefundPending,
     currentStep,
     
     // Data
@@ -184,6 +243,7 @@ export function useBullRunContract() {
     // Actions
     createGame,
     createGameAfterApproval,
+    refundPrizePool,
     getGame,
   }
 }
