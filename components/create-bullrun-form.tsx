@@ -32,11 +32,19 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
   const { coinData, isLoading: isCoinLoading, error: coinError, fetchCoinData, clearData } = useZoraCoin()
   const { 
     createGame, 
+    createGameAfterApproval,
     isLoading, 
     error: contractError, 
     isCreateGameSuccess,
+    currentStep,
     minBudget 
   } = useBullRunContract()
+
+  // Store form data for the second step
+  const [pendingGameData, setPendingGameData] = useState<{
+    coinAddress: string;
+    prizePool: string;
+  } | null>(null)
 
   // Fetch coin data when address changes
   useEffect(() => {
@@ -74,6 +82,20 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
     }
   }, [contractError])
 
+  // Auto-create game after USDC approval succeeds
+  useEffect(() => {
+    if (currentStep === 'approving' && pendingGameData) {
+      // Wait a bit for the approval transaction to be confirmed
+      const timer = setTimeout(() => {
+        if (pendingGameData) {
+          createGameAfterApproval(pendingGameData.coinAddress, pendingGameData.prizePool)
+        }
+      }, 2000) // Wait 2 seconds for approval confirmation
+
+      return () => clearTimeout(timer)
+    }
+  }, [currentStep, pendingGameData, createGameAfterApproval])
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
@@ -91,7 +113,7 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
     if (!formData.prizePool || Number.isNaN(prizePool)) {
       newErrors.prizePool = "Prize pool is required"
     } else if (prizePool < 3) {
-      newErrors.prizePool = "Minimum prize pool is 100 USDC"
+      newErrors.prizePool = "Minimum prize pool is 3 USDC"
     }
 
     // Check against contract minimum if available
@@ -109,16 +131,24 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
     if (!validateForm()) return
 
     try {
-      // Call the smart contract to create the game
+      // Store the game data for the second step
+      setPendingGameData({
+        coinAddress: formData.coinAddress,
+        prizePool: formData.prizePool
+      })
+
+      // Call the smart contract to approve USDC and create the game
       const result = await createGame(formData.coinAddress, formData.prizePool)
       
       if (result?.success) {
-        toast.success("Transaction submitted! Waiting for confirmation...")
-        // The useEffect above will handle the success case when transaction is confirmed
+        if (result.step === 'approving') {
+          toast.success("USDC approval submitted! Waiting for confirmation...")
+        }
       }
     } catch (error) {
       console.error("Failed to create game:", error)
       toast.error(`Failed to create game: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setPendingGameData(null)
     }
   }
 
@@ -320,10 +350,20 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
           <CardContent className="pt-6">
             <div className="text-center space-y-3">
               <div className="w-8 h-8 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mx-auto"></div>
-              <div className="text-blue-300 font-medium">Creating Game...</div>
-              <div className="text-sm text-blue-200">
-                Transaction submitted to blockchain. Please wait for confirmation.
+              <div className="text-blue-300 font-medium">
+                {currentStep === 'approving' ? 'Approving USDC...' : 'Creating Game...'}
               </div>
+              <div className="text-sm text-blue-200">
+                {currentStep === 'approving' 
+                  ? 'Approving USDC spending for the BullRun contract...'
+                  : 'Creating your BullRun game on the blockchain...'
+                }
+              </div>
+              {currentStep === 'approving' && (
+                <div className="text-xs text-blue-100">
+                  This step is required before creating the game
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -357,7 +397,9 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
             {isLoading ? (
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
-                <span>Creating Game...</span>
+                <span>
+                  {currentStep === 'approving' ? 'Approving USDC...' : 'Creating Game...'}
+                </span>
               </div>
             ) : (
               <div className="flex items-center space-x-2">

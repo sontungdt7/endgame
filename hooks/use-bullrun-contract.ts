@@ -5,10 +5,39 @@ import { parseUnits, formatUnits } from 'viem'
 import { BULLRUN_CONTRACT_ADDRESS, BULLRUN_ABI } from '@/lib/bullrun'
 import { getTokenBySymbol } from '@/lib/tokens'
 
+// USDC ABI for approval function
+const USDC_ABI = [
+  {
+    "type": "function",
+    "name": "approve",
+    "inputs": [
+      {
+        "name": "spender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  }
+] as const
+
 export function useBullRunContract() {
   const { user, ready } = usePrivy()
   const { address } = useAccount()
   const [error, setError] = useState<string | null>(null)
+  const [currentStep, setCurrentStep] = useState<'idle' | 'approving' | 'creating' | 'success'>('idle')
 
   // Get USDC token info
   const usdcToken = getTokenBySymbol('USDC')
@@ -28,20 +57,33 @@ export function useBullRunContract() {
     functionName: 'MIN_BUDGET',
   })
 
-  // Contract write for creating a game
+  // USDC approval contract write
+  const { 
+    data: approveHash, 
+    writeContract: approveUSDC, 
+    isPending: isApprovePending,
+    error: approveError
+  } = useWriteContract()
+
+  // Game creation contract write
   const { 
     data: createGameHash, 
-    writeContract, 
+    writeContract: createGameWrite, 
     isPending: isCreateGamePending,
     error: createGameError
   } = useWriteContract()
+
+  // Wait for USDC approval transaction
+  const { isLoading: isApproveLoading, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
+    hash: approveHash,
+  })
 
   // Wait for create game transaction
   const { isLoading: isCreateGameLoading, isSuccess: isCreateGameSuccess } = useWaitForTransactionReceipt({
     hash: createGameHash,
   })
 
-  // Create a new BullRun game
+  // Create a new BullRun game with USDC approval
   const createGame = async (postCoinAddress: string, prizePool: string) => {
     if (!user || !ready || !address) {
       throw new Error('Wallet not connected')
@@ -51,8 +93,8 @@ export function useBullRunContract() {
       throw new Error('USDC token not found')
     }
 
-    if (!writeContract) {
-      throw new Error('Contract write function not available')
+    if (!approveUSDC || !createGameWrite) {
+      throw new Error('Contract write functions not available')
     }
 
     try {
@@ -64,24 +106,51 @@ export function useBullRunContract() {
         throw new Error(`Prize pool must be at least ${formatUnits(minBudget, 6)} USDC`)
       }
 
-      // Call the contract write function
-      writeContract({
-        address: BULLRUN_CONTRACT_ADDRESS,
-        abi: BULLRUN_ABI,
-        functionName: 'createGame',
-        args: [postCoinAddress as `0x${string}`, prizePoolUnits]
+      setCurrentStep('approving')
+      setError(null)
+
+      // Step 1: Approve USDC spending
+      approveUSDC({
+        address: usdcAddress,
+        abi: USDC_ABI,
+        functionName: 'approve',
+        args: [BULLRUN_CONTRACT_ADDRESS, prizePoolUnits]
       })
 
+      // The approval success will trigger the game creation in the useEffect below
+      
       return {
         success: true,
-        transactionHash: createGameHash,
+        step: 'approving',
         gameId: nextGameId ? Number(nextGameId) : undefined
       }
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create game'
       setError(errorMessage)
+      setCurrentStep('idle')
       throw new Error(errorMessage)
+    }
+  }
+
+  // Auto-create game after USDC approval succeeds
+  const createGameAfterApproval = async (postCoinAddress: string, prizePool: string) => {
+    if (!createGameWrite) return
+
+    try {
+      setCurrentStep('creating')
+      const prizePoolUnits = parseUnits(prizePool, 6)
+
+      // Step 2: Create the game
+      createGameWrite({
+        address: BULLRUN_CONTRACT_ADDRESS,
+        abi: BULLRUN_ABI,
+        functionName: 'createGame',
+        args: [postCoinAddress as `0x${string}`, prizePoolUnits]
+      })
+    } catch (err) {
+      setError('Failed to create game after approval')
+      setCurrentStep('idle')
     }
   }
 
@@ -103,9 +172,10 @@ export function useBullRunContract() {
 
   return {
     // State
-    isLoading: isCreateGamePending || isCreateGameLoading,
-    error: error || createGameError?.message || null,
+    isLoading: isApprovePending || isApproveLoading || isCreateGamePending || isCreateGameLoading,
+    error: error || approveError?.message || createGameError?.message || null,
     isCreateGameSuccess,
+    currentStep,
     
     // Data
     nextGameId: nextGameId ? Number(nextGameId) : undefined,
@@ -113,6 +183,7 @@ export function useBullRunContract() {
     
     // Actions
     createGame,
+    createGameAfterApproval,
     getGame,
   }
 }
