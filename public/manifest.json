@@ -1,7 +1,7 @@
 {
   "name": "ViralPost",
   "short_name": "ViralPost",
-  "description": "Last buyer wins gaming platform",
+  "description": "ViralPost Desc",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

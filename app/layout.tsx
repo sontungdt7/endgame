@@ -4,21 +4,41 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { PrivyProviderWrapper } from "@/components/privy-provider"
 import { WagmiProviderWrapper } from "@/components/wagmi-provider"
+import { MiniKitContextProvider } from "@/components/minikit-provider"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
-export const metadata: Metadata = {
-  title: "ViralPost", // Updated branding
-  description: "Last buyer wins gaming platform", // Removed specific tagline
-  generator: "v0.dev",
-  icons: {
-    icon: [
-      { url: '/icon.svg', type: 'image/svg+xml' },
-      { url: '/favicon.ico', sizes: 'any' }
-    ],
-    apple: '/apple-touch-icon.png',
-  },
-  manifest: '/manifest.json',
+export async function generateMetadata(): Promise<Metadata> {
+  const URL = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+  return {
+    title: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "ViralPost",
+    description: "ViralPost Desc",
+    generator: "v0.dev",
+    icons: {
+      icon: [
+        { url: '/icon.svg', type: 'image/svg+xml' },
+        { url: '/favicon.ico', sizes: 'any' }
+      ],
+      apple: '/apple-touch-icon.png',
+    },
+    manifest: '/manifest.json',
+    other: {
+      'fc:frame': JSON.stringify({
+        version: 'next',
+        imageUrl: process.env.NEXT_PUBLIC_APP_HERO_IMAGE || `${URL}/hero.png`,
+        button: {
+          title: `Launch ${process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || 'ViralPost'}`,
+          action: {
+            type: 'launch_frame',
+            name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || 'ViralPost',
+            url: URL,
+            splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE || `${URL}/splash.png`,
+            splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR || '#000000',
+          },
+        },
+      }),
+    },
+  };
 }
 
 export default function RootLayout({
@@ -38,12 +58,14 @@ html {
         `}</style>
       </head>
       <body className="bg-gray-900 text-white antialiased">
-        <PrivyProviderWrapper>
-          <WagmiProviderWrapper>
-            {children}
-            <Toaster />
-          </WagmiProviderWrapper>
-        </PrivyProviderWrapper>
+        <MiniKitContextProvider>
+          <PrivyProviderWrapper>
+            <WagmiProviderWrapper>
+              {children}
+              <Toaster />
+            </WagmiProviderWrapper>
+          </PrivyProviderWrapper>
+        </MiniKitContextProvider>
       </body>
     </html>
   )
