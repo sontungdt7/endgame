@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, use } from "react"
-import { GameHeader } from "@/components/game-header"
+import { Header } from "@/components/header"
 import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
 import { useGame } from "@/hooks/useGame"
 import { useBullRunContract } from "@/hooks/use-bullrun-contract"
@@ -181,7 +181,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white">
-        <GameHeader />
+        <Header />
         <main className="container mx-auto px-4 py-6 max-w-7xl">
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -198,7 +198,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
   if (error || !game) {
     return (
       <div className="min-h-screen bg-gray-900 text-white">
-        <GameHeader />
+        <Header />
         <main className="container mx-auto px-4 py-6 max-w-7xl">
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -263,7 +263,7 @@ export default function GameDetailPage({ params }: { params: Promise<{ id:string
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <GameHeader />
+      <Header />
 
       <main className="container mx-auto px-4 py-6 max-w-7xl">
         {/* Trading-style Token Header */}

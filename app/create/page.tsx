@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { GameHeader } from "@/components/game-header"
+import { Header } from "@/components/header"
 import { CreateBullRunForm } from "@/components/create-bullrun-form"
 import { CreateConfirmation } from "@/components/create-confirmation"
 import { PrivyWalletGuard } from "@/components/privy-wallet-guard"
@@ -27,7 +27,7 @@ export default function CreateBullRunPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <GameHeader />
+      <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-8">

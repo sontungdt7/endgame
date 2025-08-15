@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import { PrivyProviderWrapper } from "@/components/privy-provider"
 import { WagmiProviderWrapper } from "@/components/wagmi-provider"
 import { MiniKitContextProvider } from "@/components/minikit-provider"
+import { BottomNavigation } from "@/components/bottom-navigation"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 
@@ -57,11 +58,12 @@ html {
 }
         `}</style>
       </head>
-      <body className="bg-gray-900 text-white antialiased">
+      <body className="bg-gray-900 text-white antialiased pb-20 md:pb-0">
         <MiniKitContextProvider>
           <PrivyProviderWrapper>
             <WagmiProviderWrapper>
               {children}
+              <BottomNavigation />
               <Toaster />
             </WagmiProviderWrapper>
           </PrivyProviderWrapper>

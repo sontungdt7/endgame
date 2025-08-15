@@ -9,12 +9,15 @@ export function Header() {
           <Link href="/" className="text-xl font-bold text-white hover:text-green-400 transition-colors">
             ViralPost
           </Link>
-          <nav className="flex items-center space-x-4">
+          <nav className="hidden md:flex items-center space-x-4">
             <Link href="/" className="text-gray-300 hover:text-white transition-colors">
-              Explore
+              Home
             </Link>
             <Link href="/create" className="text-gray-300 hover:text-white transition-colors">
               Create Game
+            </Link>
+            <Link href="/profile" className="text-gray-300 hover:text-white transition-colors">
+              Profile
             </Link>
           </nav>
         </div>
