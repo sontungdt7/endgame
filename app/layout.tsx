@@ -12,8 +12,8 @@ import "./globals.css"
 export async function generateMetadata(): Promise<Metadata> {
   const URL = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
   return {
-    title: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "ViralPost",
-    description: "ViralPost Desc",
+    title: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || "EndGame",
+    description: "EndGame Desc",
     generator: "v0.dev",
     icons: {
       icon: [
@@ -28,10 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
         version: 'next',
         imageUrl: process.env.NEXT_PUBLIC_APP_HERO_IMAGE || `${URL}/hero.png`,
         button: {
-          title: `Launch ${process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || 'ViralPost'}`,
+          title: `Launch ${process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || 'EndGame'}`,
           action: {
             type: 'launch_frame',
-            name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || 'ViralPost',
+            name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME || 'EndGame',
             url: URL,
             splashImageUrl: process.env.NEXT_PUBLIC_APP_SPLASH_IMAGE || `${URL}/splash.png`,
             splashBackgroundColor: process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR || '#000000',

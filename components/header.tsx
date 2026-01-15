@@ -7,7 +7,7 @@ export function Header() {
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-6">
           <Link href="/" className="text-xl font-bold text-white hover:text-green-400 transition-colors">
-            ViralPost
+            EndGame
           </Link>
           <nav className="hidden md:flex items-center space-x-4">
             <Link href="/" className="text-gray-300 hover:text-white transition-colors">
