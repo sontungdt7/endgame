@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { PrivyWalletConnectButton } from "@/components/privy-wallet-connect-button"
+import { NetworkSwitcher } from "@/components/network-switcher"
 
 export function Header() {
   return (
@@ -22,7 +23,10 @@ export function Header() {
           </nav>
         </div>
 
-        <PrivyWalletConnectButton />
+        <div className="flex items-center gap-3">
+          <NetworkSwitcher />
+          <PrivyWalletConnectButton />
+        </div>
       </div>
     </header>
   )

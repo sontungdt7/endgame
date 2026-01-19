@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertCircle, Rocket, DollarSign, Image as ImageIcon, Clock, TrendingUp } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useBullRunContract } from "@/hooks/use-bullrun-contract"
 import { useLiquidityLauncher } from "@/hooks/use-liquidity-launcher"
-import { TOKEN_FACTORY_ADDRESS, LIQUIDITY_LAUNCHER_ADDRESS, CONTINUOUS_CLEARING_AUCTION_FACTORY_ADDRESS, type MigratorParameters, type AuctionParameters } from "@/lib/liquidity-launcher"
+import { TOKEN_FACTORY_ADDRESS, LIQUIDITY_LAUNCHER_ADDRESS, CONTINUOUS_CLEARING_AUCTION_FACTORY_ADDRESS, type MigratorParameters, type AuctionParameters, computeGraffiti, precomputeTokenAddress } from "@/lib/liquidity-launcher"
 import { getTokenBySymbol } from "@/lib/tokens"
-import { encodeAbiParameters, parseAbiParameters } from "viem"
+import { encodeAbiParameters, parseAbiParameters, encodePacked } from "viem"
 import { useAccount, useBlockNumber } from "wagmi"
+import { usePrivy } from "@privy-io/react-auth"
+import { uploadToIPFS } from "@/lib/ipfs"
 import { toast } from "sonner"
 
 interface CreateBullRunFormProps {
@@ -27,6 +28,15 @@ interface CreateBullRunFormProps {
 }
 
 export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
+  const safeStringify = (value: unknown) =>
+    JSON.stringify(
+      value,
+      (_key, val) => (typeof val === "bigint" ? val.toString() : val),
+      2
+    )
+
+  const txUrl = (hash?: string) => (hash ? `https://sepolia.etherscan.io/tx/${hash}` : "")
+
   const [formData, setFormData] = useState({
     coinName: "",
     ticker: "",
@@ -38,42 +48,45 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   
-  const { address } = useAccount()
-  const { data: currentBlockNumber } = useBlockNumber({ watch: true })
-  
-  const { 
-    createGame, 
-    createGameAfterApproval,
-    isLoading: isBullRunLoading, 
-    error: contractError, 
-    isCreateGameSuccess,
-    currentStep: bullRunStep,
-    minBudget 
-  } = useBullRunContract()
+  const { address, isConnected, chainId } = useAccount()
+  const { ready: privyReady, authenticated, user } = usePrivy()
+  const { data: currentBlockNumber } = useBlockNumber({ watch: true, chainId: 11155111 }) // Sepolia chainId
 
   const {
     createToken: createLiquidityToken,
     distributeToken: distributeLiquidityToken,
-    isLoading: isLiquidityLauncherLoading,
+    isLoading,
     error: liquidityLauncherError,
+    errorDetails: liquidityLauncherErrorDetails,
     isCreateTokenSuccess,
     isDistributeTokenSuccess,
-    currentStep: liquidityStep,
+    currentStep,
     createTokenHash,
     distributeTokenHash,
     createdTokenAddress
   } = useLiquidityLauncher()
-
-  const isLoading = isBullRunLoading || isLiquidityLauncherLoading
-  const currentStep = liquidityStep !== 'idle' ? liquidityStep : bullRunStep
 
   // Store form data for the second step
   const [pendingGameData, setPendingGameData] = useState<{
     prizePool: string;
   } | null>(null)
 
+  const [launchDialogOpen, setLaunchDialogOpen] = useState(false)
+  const [launchStep, setLaunchStep] = useState<
+    "idle" | "uploading" | "createToken_wallet" | "createToken_confirming" | "distribute_wallet" | "distribute_confirming" | "done" | "error"
+  >("idle")
+  const [pendingLaunch, setPendingLaunch] = useState<{
+    tokenAddress: `0x${string}`
+    totalSupplyWei: bigint
+    migratorParams: MigratorParameters
+    auctionParams: AuctionParameters
+  } | null>(null)
+
   // Store created token address
   const [tokenAddress, setTokenAddress] = useState<`0x${string}` | null>(null)
+  
+  // Store IPFS URL for the uploaded image
+  const [ipfsImageUrl, setIpfsImageUrl] = useState<string>("")
 
   // Handle image file selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,30 +132,24 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
   // uint24 = 3 bytes, uint40 = 5 bytes, total = 8 bytes per step
   // Steps should be monotonically increasing in token issuance rate
   const encodeAuctionSteps = (steps: Array<{ mps: number; blockDelta: number }>): `0x${string}` => {
-    let encoded = '0x' as `0x${string}`
+    let encoded = "0x" as `0x${string}`
     for (const step of steps) {
-      // Encode uint24 mps (3 bytes, big-endian)
-      const mps = BigInt(step.mps) & BigInt(0xFFFFFF)
-      const mpsBytes = new Uint8Array(3)
-      for (let i = 0; i < 3; i++) {
-        mpsBytes[2 - i] = Number((mps >> BigInt(i * 8)) & BigInt(0xFF))
+      // Bounds checks (uint24, uint40)
+      if (step.mps < 0 || step.mps > 0xFFFFFF) {
+        throw new Error(`auction step mps out of range (uint24): ${step.mps}`)
       }
-      
-      // Encode uint40 blockDelta (5 bytes, big-endian)
-      const blockDelta = BigInt(step.blockDelta) & BigInt(0xFFFFFFFFFF)
-      const blockDeltaBytes = new Uint8Array(5)
-      for (let i = 0; i < 5; i++) {
-        blockDeltaBytes[4 - i] = Number((blockDelta >> BigInt(i * 8)) & BigInt(0xFF))
+      if (step.blockDelta < 0 || step.blockDelta > 0xFFFFFFFFFF) {
+        throw new Error(`auction step blockDelta out of range (uint40): ${step.blockDelta}`)
       }
-      
-      // Concatenate: mps (3 bytes) + blockDelta (5 bytes) = 8 bytes total
-      const stepBytes = new Uint8Array([...mpsBytes, ...blockDeltaBytes])
-      const hex = Array.from(stepBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('')
-      encoded = (encoded + hex) as `0x${string}`
+      // This matches Solidity exactly:
+      // abi.encodePacked(uint24(mps), uint40(blockDelta))
+      const packed = encodePacked(
+        ["uint24", "uint40"],
+        [step.mps, step.blockDelta]
+      ) as `0x${string}`
+      encoded = (encoded + packed.slice(2)) as `0x${string}`
     }
-    return encoded
+    return encoded as `0x${string}`
   }
 
   // Helper function to start distribution after token is created
@@ -254,7 +261,7 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
         totalSupplyWei,
         migratorParams,
         auctionParams,
-        address // governanceAddress
+        false // payerIsUser - false when tokens are in launcher
       )
 
     } catch (error) {
@@ -263,76 +270,28 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
     }
   }
 
-  // Handle successful token creation - extract token address and start distribution
+  // Handle successful distributeToken (2-step flow)
   useEffect(() => {
-    if (isCreateTokenSuccess && createTokenHash && !tokenAddress) {
-      toast.success("✅ Token created successfully!")
-      
-      // Try to get token address from the hook
-      if (createdTokenAddress) {
-        setTokenAddress(createdTokenAddress)
-        // Calculate total supply in wei (1B tokens with 18 decimals)
-        const totalSupplyWei = BigInt("1000000000000000000000000000")
-        // Start distribution automatically
-        startDistribution(createdTokenAddress, totalSupplyWei)
-      } else {
-        // If we don't have the address yet, show a message
-        toast.info("Token created! Extracting token address from transaction...")
-      }
-    }
-  }, [isCreateTokenSuccess, createTokenHash, createdTokenAddress, tokenAddress, address, formData.auctionDuration, formData.priceFloor])
-
-  // Handle successful token distribution - then create BullRun game
-  useEffect(() => {
-    if (isDistributeTokenSuccess && tokenAddress && pendingGameData) {
-      toast.success("🚀 Auction started successfully!")
-      // Now create the BullRun game with the token address
-      // First approve USDC, then create game
-      createGame(tokenAddress, pendingGameData.prizePool)
-    }
-  }, [isDistributeTokenSuccess, tokenAddress, pendingGameData, createGame])
-
-  // Handle successful game creation
-  useEffect(() => {
-    if (isCreateGameSuccess) {
-      toast.success("🎮 Game created successfully!")
-      // You might want to get the actual game ID from the contract here
+    if (isDistributeTokenSuccess && pendingGameData) {
+      toast.success("🚀 Token created and auction started successfully!")
       const gameId = Math.random().toString(36).substring(7) // Temporary fallback
       const gameData = {
         id: gameId,
         gameLink: `${window.location.origin}/game/${gameId}`,
-        prizePool: Number.parseFloat(formData.prizePool),
+        prizePool: Number.parseFloat(pendingGameData.prizePool),
         duration: formData.auctionDuration,
       }
       onGameCreated(gameData)
     }
-  }, [isCreateGameSuccess, formData.prizePool, formData.auctionDuration, onGameCreated])
+  }, [isDistributeTokenSuccess, pendingGameData, formData.auctionDuration, onGameCreated])
 
-  // Handle contract errors
+  // Handle liquidity launcher errors (already handled in form, this is for toast notifications)
   useEffect(() => {
-    if (contractError) {
-      toast.error(`Contract Error: ${contractError}`)
+    if (liquidityLauncherError && !isLoading) {
+      // Error toast is already shown in the error display card
+      // This effect can be used for additional notifications if needed
     }
-    if (liquidityLauncherError) {
-      toast.error(`LiquidityLauncher Error: ${liquidityLauncherError}`)
-    }
-  }, [contractError, liquidityLauncherError])
-
-  // Auto-create game after USDC approval succeeds
-  useEffect(() => {
-    if (currentStep === 'approving' && pendingGameData) {
-      // Wait a bit for the approval transaction to be confirmed
-      const timer = setTimeout(() => {
-        if (pendingGameData) {
-          // Note: Contract still requires coinAddress, using placeholder
-          const placeholderCoinAddress = "0x0000000000000000000000000000000000000000"
-          createGameAfterApproval(placeholderCoinAddress, pendingGameData.prizePool)
-        }
-      }, 2000) // Wait 2 seconds for approval confirmation
-
-      return () => clearTimeout(timer)
-    }
-  }, [currentStep, pendingGameData, createGameAfterApproval])
+  }, [liquidityLauncherError, isLoading])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -377,11 +336,6 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
       newErrors.prizePool = "Prize pool cannot be negative"
     }
 
-    // Check against contract minimum if available
-    if (minBudget && prizePool < Number(minBudget)) {
-      newErrors.prizePool = `Minimum prize pool is ${minBudget} USDC (contract requirement)`
-    }
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -391,47 +345,403 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
 
     if (!validateForm()) return
 
+    // Check wallet connection before proceeding
+    if (!privyReady) {
+      toast.error("Wallet provider is still initializing. Please wait...")
+      return
+    }
+
+    if (!authenticated || !user) {
+      toast.error("Please connect your wallet first")
+      return
+    }
+
+    if (!isConnected || !address) {
+      toast.error("Wallet is not connected. Please ensure your wallet is connected and try again.")
+      return
+    }
+
     try {
       // Store the game data for later use
       setPendingGameData({
         prizePool: formData.prizePool
       })
 
-      // Step 1: Create token via LiquidityLauncher
+      // Step 1: Upload image to IPFS
+      let imageUri = ""
+      if (formData.imageFile) {
+        setLaunchDialogOpen(true)
+        setLaunchStep("uploading")
+        toast.info("Uploading image to IPFS...")
+        try {
+          // Use Pinata as preferred service since it's configured
+          const ipfsResult = await uploadToIPFS(formData.imageFile, "pinata")
+          imageUri = ipfsResult.ipfsUrl // Use ipfs:// URL for token metadata
+          setIpfsImageUrl(ipfsResult.gatewayUrl) // Store gateway URL for display
+          toast.success(`✅ Image uploaded to IPFS: ${ipfsResult.ipfsHash.substring(0, 10)}...`)
+        } catch (ipfsError) {
+          console.error("Failed to upload image to IPFS:", ipfsError)
+          const errorMessage = ipfsError instanceof Error ? ipfsError.message : 'Unknown error'
+          
+          // Check for common error types
+          if (errorMessage.includes("maintenance") || errorMessage.includes("undergoing")) {
+            toast.error(
+              `IPFS service is undergoing maintenance. Please configure Pinata as backup ` +
+              `(NEXT_PUBLIC_PINATA_API_KEY and NEXT_PUBLIC_PINATA_API_SECRET) or try again later.`,
+              { duration: 10000 }
+            )
+          } else if (errorMessage.includes("Both IPFS services failed") || errorMessage.includes("No Storacha space")) {
+            toast.error(
+              `IPFS upload failed: ${errorMessage}. ` +
+              `Please configure Pinata credentials (NEXT_PUBLIC_PINATA_API_KEY and NEXT_PUBLIC_PINATA_API_SECRET) ` +
+              `or set up Storacha account first.`,
+              { duration: 10000 }
+            )
+          } else if (errorMessage.includes("@storacha/client")) {
+            toast.error(
+              `Storacha client not installed. Please run: npm install @storacha/client ` +
+              `or configure Pinata credentials as alternative.`,
+              { duration: 10000 }
+            )
+          } else {
+            toast.error(`Failed to upload image to IPFS: ${errorMessage}`, { duration: 8000 })
+          }
+          
+          setPendingGameData(null)
+          setLaunchStep("error")
+          return
+        }
+      } else if (formData.image) {
+        // If image is already a URL (fallback), use it directly
+        imageUri = formData.image
+      }
+
+      setLaunchDialogOpen(true)
+      setLaunchStep("createToken_wallet")
       toast.info("Creating token via LiquidityLauncher...")
       
       // Calculate total supply (e.g., 1 billion tokens with 18 decimals)
       const totalSupply = "1000000000" // 1B tokens
       const decimals = 18
+      const totalSupplyWei = BigInt("1000000000000000000000000000") // 1B tokens with 18 decimals
       
-      // Recipient should be LiquidityLauncher address when using multicall
-      // For now, we'll use the launcher address so tokens go there first
-      const recipient = LIQUIDITY_LAUNCHER_ADDRESS
+      // Get USDC address for Sepolia (chainId 11155111)
+      const usdcAddress = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" as `0x${string}` // Sepolia USDC
+      
+      // Get current block number (use actual block number if available, otherwise estimate)
+      const currentBlock = currentBlockNumber ? BigInt(currentBlockNumber.toString()) : BigInt(0)
+      if (currentBlock === BigInt(0)) {
+        throw new Error("Unable to get current block number. Please try again.")
+      }
+      
+      // Calculate block numbers
+      // Sepolia has ~12 seconds per block, so auctionDurationBlocks = duration_hours * 3600 / 12
+      const auctionDurationBlocks = BigInt(Math.floor(formData.auctionDuration * 3600 / 12))
+      const startBlock = currentBlock + BigInt(5) // Start 5 blocks from now (buffer for transaction confirmation)
+      const endBlock = startBlock + auctionDurationBlocks
+      const claimBlock = endBlock + BigInt(10) // 10 blocks after end for claiming
+      const migrationBlock = endBlock + BigInt(100) // 100 blocks after end for migration
+      const sweepBlock = migrationBlock + BigInt(1000) // 1000 blocks after migration for sweeping
 
-      // Create token
+      // Calculate token split (80% to auction, 20% to reserve)
+      // tokenSplitToAuction is in mps (1e7 = 100%), so 80% = 8e6
+      const tokenSplitToAuction = 8e6 // 80%
+
+      // Create auction steps (monotonically increasing as recommended)
+      // Steps should increase issuance rate over time
+      // Each step: (mps per block, block delta)
+      // mps is in 1e7 basis, so 1e6 = 0.1% per block, 1e5 = 0.01% per block
+      const totalBlocks = Number(auctionDurationBlocks)
+      const step1Blocks = Math.floor(totalBlocks * 0.4) // First 40% of auction
+      const step2Blocks = Math.floor(totalBlocks * 0.4) // Next 40%
+      const step3Blocks = totalBlocks - step1Blocks - step2Blocks // Final 20% (most important for price discovery)
+      
+      // Issuance rates: start low, increase over time
+      // Step 1: 0.05% per block (5e5 mps)
+      // Step 2: 0.1% per block (1e6 mps)  
+      // Step 3: 0.15% per block (1.5e6 mps) - higher rate at end for better price discovery
+      const auctionSteps = encodeAuctionSteps([
+        { mps: 5e5, blockDelta: step1Blocks }, // 0.05% per block for first 40%
+        { mps: 1e6, blockDelta: step2Blocks }, // 0.1% per block for next 40%
+        { mps: 15e5, blockDelta: step3Blocks } // 0.15% per block for final 20% (critical for final price)
+      ])
+
+      // Build MigratorParameters
+      const migratorParams: MigratorParameters = {
+        migrationBlock,
+        currency: usdcAddress,
+        poolLPFee: 3000, // 0.3% fee (in hundredths of a bip, so 3000 = 0.3%)
+        poolTickSpacing: 60, // Standard tick spacing
+        tokenSplitToAuction,
+        auctionFactory: CONTINUOUS_CLEARING_AUCTION_FACTORY_ADDRESS,
+        positionRecipient: address,
+        sweepBlock,
+        operator: address,
+        createOneSidedTokenPosition: false,
+        createOneSidedCurrencyPosition: false
+      }
+
+      // Build AuctionParameters
+      // fundsRecipient should be MSG_SENDER (address(1)) which means the strategy will receive funds
+      const MSG_SENDER = "0x0000000000000000000000000000000000000001" as `0x${string}`
+      
+      // Floor price in Q96 format (multiply by 2^96)
+      // Price is: currency per token, so if priceFloor is in USDC, we need to convert
+      // Q96 = 2^96 = 79228162514264337593543950336
+      const Q96 = BigInt("79228162514264337593543950336")
+      // floorPrice in USDC (6 decimals) per token (18 decimals)
+      // For Q96: price = (currencyAmount * 1e6) * Q96 / (tokenAmount * 1e18)
+      // Simplified: if priceFloor is "0.001" USDC per token:
+      // price = 0.001 * 1e6 * Q96 / 1e18 = 0.001 * Q96 / 1e12
+      const priceFloorValue = Number.parseFloat(formData.priceFloor)
+      const floorPriceQ96 = BigInt(Math.floor(priceFloorValue * 1e6)) * Q96 / BigInt(1e18)
+      
+      // Tick spacing: should be at least 1 basis point (0.01%) of floor price
+      // Recommended: 1% or 10% of floor price for gas efficiency
+      // Using 1% = 0.01 * floorPriceQ96 / 100 = floorPriceQ96 / 10000
+      // But tick spacing is a uint256, so we'll use a reasonable fixed value
+      // Documentation suggests at least 1 basis point, 1% or 10% is reasonable
+      // Using 1% of floor price as tick spacing
+      const tickSpacing = floorPriceQ96 / BigInt(10000) // 1% of floor price
+      
+      const auctionParams: AuctionParameters = {
+        currency: usdcAddress,
+        tokensRecipient: address, // Leftover tokens go to user
+        fundsRecipient: MSG_SENDER, // Must be MSG_SENDER for LBP strategy
+        startBlock,
+        endBlock,
+        claimBlock,
+        tickSpacing, // Calculated as 1% of floor price
+        validationHook: "0x0000000000000000000000000000000000000000" as `0x${string}`, // No validation hook
+        floorPrice: floorPriceQ96, // In Q96 format
+        requiredCurrencyRaised: BigInt(0), // No minimum required (can be set if needed)
+        auctionStepsData: auctionSteps
+      }
+
+      // Precompute token address (deterministic)
+      const graffiti = computeGraffiti(address as `0x${string}`)
+      const precomputedAddress = await precomputeTokenAddress(
+        TOKEN_FACTORY_ADDRESS,
+        formData.coinName,
+        formData.ticker,
+        decimals,
+        LIQUIDITY_LAUNCHER_ADDRESS,
+        graffiti
+      )
+
+      setTokenAddress(precomputedAddress)
+      setPendingLaunch({
+        tokenAddress: precomputedAddress,
+        totalSupplyWei,
+        migratorParams,
+        auctionParams,
+      })
+
+      // Create token (minted to LiquidityLauncher). We will wait for confirmation before distribute.
       await createLiquidityToken(
         formData.coinName,
         formData.ticker,
         decimals,
         totalSupply,
-        recipient,
+        LIQUIDITY_LAUNCHER_ADDRESS,
         `A token for ${formData.coinName} game`,
         window.location.origin, // website
-        formData.image || "", // imageUri
-        TOKEN_FACTORY_ADDRESS // tokenFactory - update TOKEN_FACTORY_ADDRESS in lib/liquidity-launcher.ts
+        imageUri,
+        TOKEN_FACTORY_ADDRESS
+      )
+
+      setLaunchStep("createToken_confirming")
+      toast.info("Token creation submitted. Waiting for confirmation...")
+
+    } catch (error) {
+      console.error("❌ Failed to create token and start auction:", error)
+      setLaunchStep("error")
+      
+      // Extract detailed error information
+      let errorMessage = 'Unknown error occurred'
+      let errorReason = undefined
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+        
+        // Try to extract revert reason
+        if (error.message.includes('revert')) {
+          const revertMatch = error.message.match(/revert\s+(.+?)(?:\s+\(|$)/i)
+          if (revertMatch) {
+            errorReason = revertMatch[1]
+          }
+        }
+        
+        // Check for common error patterns
+        if (error.message.includes('insufficient funds')) {
+          errorReason = 'Insufficient ETH for gas fees'
+        } else if (error.message.includes('user rejected')) {
+          errorReason = 'Transaction was rejected by user'
+        } else if (error.message.includes('nonce')) {
+          errorReason = 'Transaction nonce error - try again'
+        }
+      }
+      
+      // Show detailed error toast
+      toast.error(
+        `Failed to create token: ${errorMessage}`,
+        {
+          duration: 12000,
+          description: errorReason ? `Reason: ${errorReason}` : undefined,
+          action: {
+            label: 'View Details',
+            onClick: () => {
+              console.log('Full error details:', error)
+              alert(`Error Details:\n\n${errorMessage}\n\n${errorReason ? `Reason: ${errorReason}` : ''}\n\nCheck browser console for more details.`)
+            }
+          }
+        }
       )
       
-      toast.info("Token creation submitted! Waiting for confirmation...")
-      
-    } catch (error) {
-      console.error("Failed to create token:", error)
-      toast.error(`Failed to create token: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setPendingGameData(null)
     }
   }
 
+  // After createToken confirms, call distributeToken (tx 2)
+  useEffect(() => {
+    const run = async () => {
+      if (!pendingLaunch) return
+      if (!isCreateTokenSuccess) return
+      if (launchStep !== "createToken_confirming") return
+
+      try {
+        setLaunchStep("distribute_wallet")
+        toast.info("Preparing auction distribution (this may take a moment)...", {
+          description: "Finding valid deployment address for auction contract..."
+        })
+
+        await distributeLiquidityToken(
+          pendingLaunch.tokenAddress,
+          pendingLaunch.totalSupplyWei,
+          pendingLaunch.migratorParams,
+          pendingLaunch.auctionParams,
+          false // payerIsUser - false when tokens are in launcher
+        )
+
+        setLaunchStep("distribute_confirming")
+        toast.success("Auction distribution ready! Please confirm transaction in wallet.")
+      } catch (e) {
+        console.error("❌ Failed to distribute token:", e)
+        setLaunchStep("error")
+        toast.error("Failed to start auction distribution", {
+          description: e instanceof Error ? e.message : "Unknown error occurred"
+        })
+      }
+    }
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreateTokenSuccess])
+
+  // When distribute confirms, mark done
+  useEffect(() => {
+    if (isDistributeTokenSuccess && launchDialogOpen) {
+      setLaunchStep("done")
+    }
+  }, [isDistributeTokenSuccess, launchDialogOpen])
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      {launchDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-xl border border-gray-700 bg-gray-900 p-5 text-white shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-lg font-semibold">Launching your token + auction</div>
+                <div className="text-sm text-gray-300 mt-1">
+                  Step-by-step progress. Please keep this tab open.
+                </div>
+              </div>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-200"
+                onClick={() => {
+                  // allow closing only if not actively signing/confirming
+                  if (isLoading) return
+                  setLaunchDialogOpen(false)
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <div className={launchStep === "uploading" ? "text-blue-300" : "text-gray-300"}>
+                  1) Upload image to IPFS
+                </div>
+                <div className="text-gray-400">
+                  {launchStep === "uploading" ? "In progress…" : ipfsImageUrl ? "Done" : "—"}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className={launchStep.startsWith("createToken") ? "text-blue-300" : "text-gray-300"}>
+                  2) Create token (tx 1)
+                </div>
+                <div className="text-gray-400">
+                  {launchStep === "createToken_wallet"
+                    ? "Waiting for wallet…"
+                    : launchStep === "createToken_confirming"
+                    ? "Confirming…"
+                    : isCreateTokenSuccess
+                    ? "Confirmed"
+                    : "—"}
+                </div>
+              </div>
+              {createTokenHash && (
+                <a className="text-xs text-blue-400 underline" href={txUrl(createTokenHash)} target="_blank" rel="noreferrer">
+                  View tx 1 on Etherscan
+                </a>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div className={launchStep.startsWith("distribute") ? "text-blue-300" : "text-gray-300"}>
+                  3) Start auction / distribute token (tx 2)
+                </div>
+                <div className="text-gray-400">
+                  {launchStep === "distribute_wallet"
+                    ? "Waiting for wallet…"
+                    : launchStep === "distribute_confirming"
+                    ? "Confirming…"
+                    : isDistributeTokenSuccess
+                    ? "Confirmed"
+                    : "—"}
+                </div>
+              </div>
+              {distributeTokenHash && (
+                <a className="text-xs text-blue-400 underline" href={txUrl(distributeTokenHash)} target="_blank" rel="noreferrer">
+                  View tx 2 on Etherscan
+                </a>
+              )}
+
+              {tokenAddress && (
+                <div className="mt-2 text-xs text-gray-300">
+                  Token address (precomputed): <span className="font-mono">{tokenAddress}</span>
+                </div>
+              )}
+
+              {launchStep === "done" && (
+                <div className="mt-3 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-green-200">
+                  Success! Token created and auction started.
+                </div>
+              )}
+
+              {launchStep === "error" && (
+                <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-red-200">
+                  Launch failed. Check the error card below and browser console for details.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
       {/* Coin Information */}
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
@@ -588,56 +898,15 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
 
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
             <div className="text-sm text-yellow-300">
-              <strong>Minimum:</strong> {minBudget ? `${minBudget} USDC (contract)` : '0 USDC'}
+              <strong>Minimum:</strong> 0 USDC
             </div>
             <div className="text-xs text-gray-400 mt-1">
               Higher prize pools attract more players and create more viral potential
             </div>
-            
           </div>
         </CardContent>
       </Card>
-
-      {/* Game Rules */}
-      <Card className="bg-gray-800 border-gray-700">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <AlertCircle className="w-5 h-5 text-green-400" />
-            <span>Game Rules</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 text-sm text-gray-300">
-            <div className="flex items-start space-x-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-              <p>
-                <strong>Last Buyer Wins:</strong> The final person to buy before the timer expires wins the entire prize
-                pool
-              </p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-              <p>
-                <strong>Timer Extension:</strong> Each purchase adds time to the countdown, keeping the game active
-              </p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
-              <p>
-                <strong>Minimum Buy:</strong> Players must meet the minimum purchase amount to participate
-              </p>
-            </div>            
-          </div>
-
-          <Alert className="border-green-500/30 bg-green-500/10">
-            <AlertCircle className="h-4 w-4 text-green-400" />
-            <AlertDescription className="text-green-300">
-              The auction duration you set determines the initial timer. The timer extends with each purchase to maintain excitement and
-              engagement.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+      
 
       {/* Transaction Status */}
       {isLoading && (
@@ -648,40 +917,87 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
               <div className="text-blue-300 font-medium">
                 {currentStep === 'creating-token' ? 'Creating Token...' :
                  currentStep === 'distributing-token' ? 'Starting Auction...' :
-                 currentStep === 'approving' ? 'Approving USDC...' : 
-                 'Creating Game...'}
+                 'Processing...'}
               </div>
               <div className="text-sm text-blue-200">
                 {currentStep === 'creating-token' 
                   ? 'Creating your token via LiquidityLauncher...'
                   : currentStep === 'distributing-token'
                   ? 'Starting the token auction via LiquidityLauncher...'
-                  : currentStep === 'approving' 
-                  ? 'Approving USDC spending for the BullRun contract...'
-                  : 'Creating your BullRun game on the blockchain...'
+                  : 'Processing your request...'
                 }
               </div>
-              {currentStep === 'approving' && (
-                <div className="text-xs text-blue-100">
-                  This step is required before creating the game
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Error Display */}
+      {liquidityLauncherError && !isLoading && (
+        <Card className="bg-red-500/10 border-red-500/30">
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-red-400" />
+                <div className="text-red-300 font-medium">
+                  Transaction Failed
+                </div>
+              </div>
+              <div className="text-sm text-red-200">
+                {liquidityLauncherError}
+              </div>
+              {liquidityLauncherErrorDetails && (
+                <div className="mt-3 p-3 bg-red-900/20 rounded border border-red-500/20">
+                  <div className="text-xs text-red-300 font-mono space-y-1">
+                    {liquidityLauncherErrorDetails.reason && (
+                      <div>
+                        <span className="text-red-400">Reason:</span> {liquidityLauncherErrorDetails.reason}
+                      </div>
+                    )}
+                    {liquidityLauncherErrorDetails.code && (
+                      <div>
+                        <span className="text-red-400">Error Code:</span> {liquidityLauncherErrorDetails.code}
+                      </div>
+                    )}
+                    {liquidityLauncherErrorDetails.data && (
+                      <div className="mt-2">
+                        <span className="text-red-400">Data:</span>
+                        <pre className="mt-1 text-xs overflow-x-auto">
+                          {safeStringify(liquidityLauncherErrorDetails.data)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      console.log('Full error details:', liquidityLauncherErrorDetails)
+                      alert(`Full Error Details:\n\n${safeStringify(liquidityLauncherErrorDetails)}\n\nCheck browser console for more information.`)
+                    }}
+                    className="mt-2 text-xs text-red-400 hover:text-red-300 underline"
+                  >
+                    View Full Error Details
+                  </button>
                 </div>
               )}
+              <div className="text-xs text-red-200/70 mt-2">
+                💡 Tip: Check the browser console (F12) for detailed error logs
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Success Message */}
-      {isCreateGameSuccess && (
+      {isDistributeTokenSuccess && (
         <Card className="bg-green-500/10 border-green-500/30">
           <CardContent className="pt-6">
             <div className="text-center space-y-3">
               <div className="w-8 h-8 bg-green-400 rounded-full flex items-center justify-center mx-auto">
                 <span className="text-green-900 text-xl">✓</span>
               </div>
-              <div className="text-green-300 font-medium">Game Created Successfully!</div>
+              <div className="text-green-300 font-medium">Token & Auction Created Successfully!</div>
               <div className="text-sm text-green-200">
-                Your BullRun game is now live on the blockchain!
+                Your token and auction are now live on the blockchain!
               </div>
             </div>
           </CardContent>
@@ -702,8 +1018,7 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
                 <span>
                   {currentStep === 'creating-token' ? 'Creating Token...' :
                    currentStep === 'distributing-token' ? 'Starting Auction...' :
-                   currentStep === 'approving' ? 'Approving USDC...' : 
-                   'Creating Game...'}
+                   'Processing...'}
                 </span>
               </div>
             ) : (
@@ -719,6 +1034,7 @@ export function CreateBullRunForm({ onGameCreated }: CreateBullRunFormProps) {
           </div>
         </CardContent>
       </Card>
-    </form>
+      </form>
+    </>
   )
 }
